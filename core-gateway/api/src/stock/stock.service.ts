@@ -64,4 +64,32 @@ export class StockService {
     
     return stockItem;
   }
+
+  async getAllStock(facilityId: string) {
+    return this.stockItemRepo.find({ where: { facilityId }, order: { currentQty: 'ASC' } });
+  }
+
+  async seedStock(facilityId: string) {
+    const drugs = [
+      { name: 'Metformin 500mg', qty: 25 },
+      { name: 'Amoxicillin 250mg', qty: 150 },
+      { name: 'Paracetamol 500mg', qty: 300 },
+      { name: 'Telmisartan 40mg', qty: 80 },
+      { name: 'Ibuprofen 400mg', qty: 120 },
+      { name: 'ORS Packets', qty: 50 },
+    ];
+
+    for (const drug of drugs) {
+      const exists = await this.stockItemRepo.findOne({ where: { facilityId, drugName: drug.name }});
+      if (!exists) {
+        await this.stockItemRepo.save(this.stockItemRepo.create({
+          facilityId,
+          drugName: drug.name,
+          unit: 'units',
+          currentQty: drug.qty
+        }));
+      }
+    }
+    return { status: 'seeded' };
+  }
 }

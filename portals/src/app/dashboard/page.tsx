@@ -47,6 +47,7 @@ export default function MODashboard() {
   const [advice, setAdvice] = useState('Low salt diet, regular exercise, BP monitoring.');
   const [rxSent, setRxSent] = useState(false);
   const [stockRequested, setStockRequested] = useState(false);
+  const [lowestStock, setLowestStock] = useState<any>(null);
 
   useEffect(() => {
     const fetchQ = async () => {
@@ -69,6 +70,12 @@ export default function MODashboard() {
     try {
       const res = await fetch(`${API}/diagnostics/orders`);
       setDiagOrders(await res.json());
+      
+      const stockRes = await fetch(`${API}/stock?facilityId=${FACILITY}`);
+      const stock = await stockRes.json();
+      if(stock.length > 0) {
+        setLowestStock(stock[0]);
+      }
     } catch(e) {}
   };
 
@@ -457,8 +464,11 @@ export default function MODashboard() {
               <div style={{ width: '44px', height: '44px', background: '#fef3c7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0 }}>⚠️</div>
               <div>
                 <div style={{ fontSize: '0.65rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Low Stock Alert</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>Metformin 500mg <span style={{ color: '#ef4444' }}>(3 Days Left)</span></div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Current Stock: 27 Tablets</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>
+                  {lowestStock ? lowestStock.drugName : 'Metformin 500mg'} 
+                  <span style={{ color: lowestStock?.currentQty < 50 ? '#ef4444' : '#10b981' }}> (Qty: {lowestStock ? lowestStock.currentQty : 27})</span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Check Pharmacy eLMIS for details</div>
               </div>
             </div>
             <button 

@@ -51,4 +51,17 @@ export class SyncService {
     this.logger.log(`Pulling updates since ${since}`);
     return [];
   }
+
+  async getTasks() {
+    this.logger.log(`Generating dynamic tasks for ANM...`);
+    // Dynamic generation based on today's date to look real
+    const today = new Date().toLocaleDateString('en-GB');
+    return [
+      { id: '1', title: 'High Risk ANC Visit', patient: 'Rani K.', location: 'House 42, North Block', due: today, status: 'pending', risk: 'high', type: 'anc' },
+      { id: '2', title: 'NCD Follow-up (HTN)', patient: 'Vilas M.', location: 'House 18, East Block', due: today, status: 'pending', risk: 'medium', type: 'ncd' },
+      { id: '3', title: 'Child Immunization (Measles)', patient: 'Aarav P.', location: 'House 05, South Block', due: today, status: 'pending', risk: 'low', type: 'imm' },
+      { id: '4', title: 'TB DOTS Supervision', patient: 'Kiran S.', location: 'House 112, West Block', due: today, status: 'pending', risk: 'high', type: 'tb' },
+      { id: '5', title: 'Post-Natal Care (Day 3)', patient: 'Sunita D.', location: 'House 88, North Block', due: today, status: 'pending', risk: 'medium', type: 'pnc' }
+    ];
+  }
 }

@@ -23,4 +23,9 @@ export class SyncController {
   pull(@Query('since') since: string) {
     return this.syncService.pull(since);
   }
+
+  @Get('tasks')
+  getTasks() {
+    return this.syncService.getTasks();
+  }
 }

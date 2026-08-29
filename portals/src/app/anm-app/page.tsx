@@ -28,13 +28,7 @@ interface HousePin {
 }
 
 // ── Mock Data ──────────────────────────────────────────────────────────────
-const INITIAL_TASKS: Task[] = [
-  { id: 't1', category: 'High-Risk ANC Visits', categoryColor: '#ef4444', badge: '4 Overdue', badgeColor: '#ef4444', patient: 'Anita Shinde', details: '8th Month · High BP (150/95)', location: 'Wadi No. 3', buttonLabel: 'Record Vitals', buttonColor: '#ef4444', completed: false, encounterType: 'ANC' },
-  { id: 't2', category: 'High-Risk ANC Visits', categoryColor: '#ef4444', badge: '4 Overdue', badgeColor: '#ef4444', patient: 'Lata Pawar', details: '7th Month · Anaemia detected', location: 'Wadi No. 1', buttonLabel: 'Record Vitals', buttonColor: '#ef4444', completed: false, encounterType: 'ANC' },
-  { id: 't3', category: 'Chronic NCD Follow-ups', categoryColor: '#d97706', badge: '6 Due', badgeColor: '#f59e0b', patient: 'Ramesh M.', details: 'Diabetes Check · HbA1c due', location: 'Wadi No. 5', buttonLabel: 'Record Vitals', buttonColor: '#f59e0b', completed: false, encounterType: 'General' },
-  { id: 't4', category: 'Chronic NCD Follow-ups', categoryColor: '#d97706', badge: '6 Due', badgeColor: '#f59e0b', patient: 'Sunanda Raut', details: 'Hypertension · BP monitoring', location: 'Wadi No. 2', buttonLabel: 'Record Vitals', buttonColor: '#f59e0b', completed: false, encounterType: 'General' },
-  { id: 't5', category: 'Child Immunization Drops', categoryColor: '#059669', badge: '2 Pending', badgeColor: '#10b981', patient: '0–5 Yr Children', details: 'Polio drops · 8 children across 2 wadis', location: 'Wadi No. 1 & 4', buttonLabel: 'Mark Visited', buttonColor: '#10b981', completed: false, encounterType: 'Immunization' },
-];
+const INITIAL_TASKS: Task[] = [];
 
 const HOUSE_PINS: HousePin[] = [
   { top: '18%', left: '22%', priority: 'high', label: 'Anita S.', visited: false },
@@ -67,6 +61,34 @@ const API = 'http://localhost:3001';
 // ── Component ───────────────────────────────────────────────────────────────
 export default function AnmApp() {
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  
+  const fetchTasks = async () => {
+    try {
+      const res = await fetch(`${API}/sync/tasks`);
+      const data = await res.json();
+      const formatted = data.map((t: any) => ({
+        id: t.id,
+        category: t.title,
+        categoryColor: t.risk === 'high' ? '#ef4444' : t.risk === 'medium' ? '#d97706' : '#059669',
+        badge: t.risk.toUpperCase(),
+        badgeColor: t.risk === 'high' ? '#ef4444' : t.risk === 'medium' ? '#f59e0b' : '#10b981',
+        patient: t.patient,
+        details: 'Sync Task',
+        location: t.location,
+        buttonLabel: t.risk === 'low' ? 'Mark Visited' : 'Record Vitals',
+        buttonColor: t.risk === 'high' ? '#ef4444' : t.risk === 'medium' ? '#f59e0b' : '#10b981',
+        completed: false,
+        encounterType: t.type === 'anc' ? 'ANC' : t.type === 'ncd' ? 'General' : 'Immunization'
+      }));
+      setTasks(formatted);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchTasks();
+  }, []);
   const [abhaStep, setAbhaStep] = useState(1);
   const [sosActive, setSosActive] = useState(false);
   const [activeSection, setActiveSection] = useState<'tasks' | 'map' | 'tools'>('tasks');
@@ -204,6 +226,7 @@ export default function AnmApp() {
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#047857' }}>Auto-Sync Active</div>
               <div style={{ fontSize: '0.7rem', color: '#10b981' }}>Connection: Good <span>●</span></div>
+              <button onClick={fetchTasks} style={{ background: '#0f766e', color: 'white', border: 'none', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer', marginTop: '0.25rem' }}>Sync Now</button>
             </div>
           </div>
         </div>
