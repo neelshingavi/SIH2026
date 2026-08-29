@@ -1,25 +1,32 @@
 import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { DiagnosticsService } from './diagnostics.service.js';
 
 @Controller('diagnostics')
 export class DiagnosticsController {
-  @Post('order')
-  orderTest(@Body() body: any) {
-    // Scaffold for diagnostic ServiceRequest
-    return {
-      status: 'ordered',
-      orderId: `diag-${Date.now()}`
-    };
+  constructor(private readonly diagnosticsService: DiagnosticsService) {}
+
+  @Get('orders')
+  getOrders() {
+    return this.diagnosticsService.getOrders();
   }
 
-  @Get('result/:id')
-  getResult(@Param('id') id: string) {
-    // Scaffold for DiagnosticReport
-    return {
-      id: id,
-      status: 'final',
-      results: [
-        { test: 'Hemoglobin', value: 12.5, unit: 'g/dL' }
-      ]
-    };
+  @Post('order')
+  orderTest(@Body() body: any) {
+    return this.diagnosticsService.orderTest(
+      body.patientId || 'pat-123',
+      body.patientName || 'Unknown Patient',
+      body.testCode || '1234-5',
+      body.testName || 'General Lab Test',
+      body.providerId || 'MO-1'
+    );
+  }
+
+  @Post(':id/result')
+  submitResult(@Param('id') id: string, @Body() body: any) {
+    return this.diagnosticsService.submitResult(
+      id,
+      body.resultValue || 0,
+      body.resultUnit || ''
+    );
   }
 }

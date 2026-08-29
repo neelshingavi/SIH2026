@@ -25,6 +25,14 @@ export default function MODashboard() {
   const [teleconsultQueue, setTeleconsultQueue] = useState<Teleconsult[]>([]);
   const [activeCall, setActiveCall] = useState<Teleconsult | null>(null);
 
+  // Diagnostics State
+  const [diagOrders, setDiagOrders] = useState<any[]>([]);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [orderForm, setOrderForm] = useState({ patientName: '', testName: 'Hemoglobin' });
+
+  // UI State
+  const [activeTab, setActiveTab] = useState('emr');
+
   // EMR State
   const [emrSearch, setEmrSearch] = useState('');
   const [emrPatient, setEmrPatient] = useState<any>(null);
@@ -55,6 +63,19 @@ export default function MODashboard() {
     fetchQ();
     const interval = setInterval(fetchQ, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      const res = await fetch(`${API}/diagnostics/orders`);
+      setDiagOrders(await res.json());
+    } catch(e) {}
+  };
+
+  useEffect(() => {
+    loadOrders();
+    const int = setInterval(loadOrders, 5000);
+    return () => clearInterval(int);
   }, []);
 
   const activeQueue = teleconsultQueue.filter(q => q.status !== 'COMPLETED');
@@ -90,6 +111,35 @@ export default function MODashboard() {
         setEmrLoading(false);
       }
     }
+  };
+
+  const handleMockLabResult = async (orderId: string) => {
+    try {
+      await fetch(`${API}/diagnostics/${orderId}/result`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resultValue: 12.5, resultUnit: 'g/dL' })
+      });
+      loadOrders();
+    } catch(e) {}
+  };
+
+  const handleOrderSubmit = async () => {
+    if(!orderForm.patientName) return;
+    try {
+      await fetch(`${API}/diagnostics/order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: `PAT-${Math.floor(Math.random()*1000)}`,
+          patientName: orderForm.patientName,
+          testCode: '1234-5',
+          testName: orderForm.testName
+        })
+      });
+      setShowOrderModal(false);
+      loadOrders();
+    } catch(e) {}
   };
 
   const handleSendRx = () => {
@@ -141,7 +191,7 @@ export default function MODashboard() {
           {[
             { label: "Today's OPD", value: '42', icon: '👥', color: '#3b82f6' },
             { label: 'Queued Teleconsults', value: activeQueue.length, icon: '📹', color: '#0ea5e9' },
-            { label: 'Pending Lab Reports', value: '12', icon: '🔬', color: '#10b981' },
+            { label: 'Pending Lab Reports', value: diagOrders.filter(o => o.status === 'PENDING').length, icon: '🔬', color: '#10b981' },
           ].map(k => (
             <div key={k.label} style={{ ...s.card, width: '140px', padding: '1rem', textAlign: 'center', flexShrink: 0 }}>
               <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, marginBottom: '0.5rem' }}>{k.label}</div>
@@ -335,85 +385,67 @@ export default function MODashboard() {
             </div>
           </div>
 
-          {/* RIGHT: Vitals + EMR */}
+          {/* RIGHT: Vitals + EMR Tabs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
-            {/* Vitals */}
-            <div style={{ ...s.card, padding: '1rem', flexShrink: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>Real-time Vitals</div>
-                <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>● Live</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.8125rem' }}>
+            <div style={{ ...s.card, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
                 {[
-                  { label: 'BP', value: '140/90 mmHg', icon: '🩺', alert: true },
-                  { label: 'Pulse', value: '96 /min', icon: '❤️' },
-                  { label: 'Temp', value: '98.6 °F', icon: '🌡️' },
-                  { label: 'SpO₂', value: '98 %', icon: '💧' },
-                  { label: 'RBS', value: '156 mg/dL', icon: '🩸', warn: true },
-                  { label: 'Weight', value: '62 kg', icon: '⚖️' },
-                ].map(v => (
-                  <div key={v.label} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '0.375rem' }}>
-                    <span style={{ color: '#64748b' }}>{v.icon} {v.label}</span>
-                    <span style={{ fontWeight: 600, color: v.alert ? '#ef4444' : v.warn ? '#d97706' : '#1e293b' }}>{v.value}</span>
+                  { id: 'emr', label: 'Record' },
+                  { id: 'diagnostics', label: 'Labs' }
+                ].map(t => (
+                  <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 600, color: activeTab === t.id ? '#0ea5e9' : '#64748b', borderBottom: activeTab === t.id ? '2px solid #0ea5e9' : 'none', cursor: 'pointer' }}>
+                    {t.label}
                   </div>
                 ))}
               </div>
-            </div>
 
-            {/* EMR */}
-            <div style={{ ...s.card, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.625rem' }}>Longitudinal Record</div>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    value={emrSearch}
-                    onChange={(e) => setEmrSearch(e.target.value)}
-                    onKeyDown={handleEmrSearch}
-                    placeholder="Search ABHA ID (Press Enter)" 
-                    style={{ width: '100%', padding: '0.375rem 0.375rem 0.375rem 1.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.75rem', boxSizing: 'border-box' }} 
-                  />
-                  <span style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.875rem' }}>🔍</span>
-                </div>
-              </div>
-              
-              {emrLoading ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>Fetching ABDM Care Context...</div>
-              ) : emrPatient ? (
-                <>
-                  <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                    <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.25rem', flexShrink: 0 }}>👤</div>
-                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{emrPatient.name}</div>
-                      <div style={{ fontSize: '0.65rem', color: '#64748b', lineHeight: 1.5 }}>
-                        {emrPatient.abha} · Verified ABHA<br />
-                        Data via ABDM HIE
-                      </div>
+              {activeTab === 'emr' ? (
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {/* EMR Content */}
+                  <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.625rem' }}>Longitudinal Record</div>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        value={emrSearch}
+                        onChange={(e) => setEmrSearch(e.target.value)}
+                        onKeyDown={handleEmrSearch}
+                        placeholder="Search ABHA ID" 
+                        style={{ width: '100%', padding: '0.375rem 0.375rem 0.375rem 1.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.75rem', boxSizing: 'border-box' }} 
+                      />
                     </div>
                   </div>
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '0.875rem 1rem' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Visit History</div>
+                  {emrPatient && (
+                    <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{emrPatient.name}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{emrPatient.abha}</div>
+                    </div>
+                  )}
+                  <div style={{ padding: '1rem' }}>
                     {emrHistory.map((v, i) => (
-                      <div key={i} style={{ display: 'flex', gap: '0.625rem', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-                        <div style={{ color: '#94a3b8', width: '45px', flexShrink: 0 }}>{v.date}</div>
-                        <div style={{ color: '#64748b' }}>{v.note}</div>
+                      <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                        <span style={{ color: '#94a3b8' }}>{v.date}</span>
+                        <span>{v.note}</span>
                       </div>
                     ))}
-                    {emrHistory.length === 0 && <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>No records found.</div>}
-                  </div>
-                </>
-              ) : (
-                <div style={{ padding: '0.875rem 1rem', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                  <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.25rem', flexShrink: 0 }}>👤</div>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{activeCall?.patientName || 'Savitri Shankar'}</div>
-                    <div style={{ fontSize: '0.65rem', color: '#64748b', lineHeight: 1.5 }}>
-                      ABHA-1234-5678-9101 · Female · 38 Y<br />
-                      9876543210
-                    </div>
                   </div>
                 </div>
+              ) : (
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <div style={{ fontWeight: 600 }}>Lab Orders</div>
+                    <button onClick={() => setShowOrderModal(true)} style={{ fontSize: '0.7rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem' }}>+ Order</button>
+                  </div>
+                  {diagOrders.map(order => (
+                    <div key={order.id} style={{ padding: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '6px', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                      <div style={{ fontWeight: 600 }}>{order.testName}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                        <span style={{ color: order.status === 'COMPLETED' ? '#10b981' : '#f59e0b' }}>{order.status}</span>
+                        {order.status === 'PENDING' && <button onClick={() => handleMockLabResult(order.id)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>🧪</button>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </div>
             </div>
           </div>
         </div>
@@ -439,6 +471,33 @@ export default function MODashboard() {
         </div>
 
       </div>
+
+      {showOrderModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '400px', background: 'white', borderRadius: '12px', padding: '1.5rem', animation: 'fadeIn 0.2s' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>Order Lab Test</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '0.25rem' }}>Patient Name</label>
+                <input value={orderForm.patientName} onChange={e => setOrderForm(f => ({...f, patientName: e.target.value}))} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} placeholder="e.g. Rahul Patil" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '0.25rem' }}>Select Test</label>
+                <select value={orderForm.testName} onChange={e => setOrderForm(f => ({...f, testName: e.target.value}))} style={{ width: '100%', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}>
+                  <option>Hemoglobin</option>
+                  <option>CBC</option>
+                  <option>Sputum AFB</option>
+                  <option>Blood Glucose (Fasting)</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                <button onClick={() => setShowOrderModal(false)} style={{ flex: 1, padding: '0.5rem', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={handleOrderSubmit} style={{ flex: 1, padding: '0.5rem', background: '#0ea5e9', border: 'none', borderRadius: '6px', fontWeight: 600, color: 'white', cursor: 'pointer' }}>Submit Order</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }
