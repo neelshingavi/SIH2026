@@ -1,0 +1,297 @@
+openapi: 3.0.3
+info:
+  title: Setu API Gateway
+  description: Core API Gateway for the Setu Rural Care-Access Platform
+  version: 1.0.0
+servers:
+  - url: https://api.setu.local/v1
+    description: Local development server
+
+paths:
+  # ==========================================
+  # Sync Engine (Section 4.4)
+  # ==========================================
+  /sync/push:
+    post:
+      summary: Push local changes to the server
+      operationId: syncPush
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/SyncResource'
+      responses:
+        '200':
+          description: Sync results for pushed resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SyncResult'
+
+  /sync/pull:
+    get:
+      summary: Pull server-side changes since a timestamp
+      operationId: syncPull
+      parameters:
+        - name: since
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: The timestamp of the last successful sync
+      responses:
+        '200':
+          description: A list of updated resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SyncResource'
+
+  # ==========================================
+  # Digital Triage (Section 5.5)
+  # ==========================================
+  /triage/evaluate:
+    post:
+      summary: Evaluate clinical observations against triage rules
+      operationId: evaluateTriage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - encounterType
+                - observations
+              properties:
+                patientId:
+                  type: string
+                encounterType:
+                  type: string
+                  example: "ANC"
+                observations:
+                  type: array
+                  items:
+                    type: object
+                    description: FHIR Observation resources or simplified payload
+      responses:
+        '200':
+          description: Triage evaluation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  riskBand:
+                    type: string
+                    enum: [NORMAL, HIGH_RISK, EMERGENCY]
+                  flags:
+                    type: array
+                    items:
+                      type: string
+                  recommendedAction:
+                    type: string
+                  ruleTrace:
+                    type: array
+                    items:
+                      type: string
+                      description: Rule IDs that fired
+
+  # ==========================================
+  # Teleconsultation (Section 8.2)
+  # ==========================================
+  /teleconsult/request:
+    post:
+      summary: Request a specialist teleconsultation
+      operationId: requestTeleconsult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - encounterId
+                - specialty
+              properties:
+                encounterId:
+                  type: string
+                specialty:
+                  type: string
+      responses:
+        '201':
+          description: Request created successfully, returns LiveKit token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  serviceRequestId:
+                    type: string
+                  roomToken:
+                    type: string
+                  roomName:
+                    type: string
+
+  # ==========================================
+  # Medicine Stock (Section 9.2)
+  # ==========================================
+  /stock/search:
+    get:
+      summary: Search for nearest facility with stock
+      operationId: searchStock
+      parameters:
+        - name: drug
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: near
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Facility ID to search near
+      responses:
+        '200':
+          description: Ranked list of facilities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    facilityId:
+                      type: string
+                    facilityName:
+                      type: string
+                    quantity:
+                      type: number
+                    distance:
+                      type: number
+
+  # ==========================================
+  # ABDM Mock Gateway (Section 11)
+  # ==========================================
+  /abdm-mock/abha/create:
+    post:
+      summary: Mock ABHA creation
+      operationId: createAbhaMock
+      responses:
+        '200':
+          description: Mocked ABHA ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  abhaId:
+                    type: string
+                    example: "91-XXXX-XXXX-XXXX"
+
+  /abdm-mock/consent/request:
+    post:
+      summary: Request consent (M3)
+      operationId: requestConsentMock
+      responses:
+        '200':
+          description: Consent requested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consentId:
+                    type: string
+                  status:
+                    type: string
+                    example: "REQUESTED"
+
+  /abdm-mock/consent/{consentId}/grant:
+    post:
+      summary: Grant a consent request
+      operationId: grantConsentMock
+      parameters:
+        - name: consentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consent granted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "GRANTED"
+
+  /abdm-mock/care-context/{abhaId}:
+    get:
+      summary: Fetch linked care contexts (FHIR Bundle)
+      operationId: fetchCareContextMock
+      parameters:
+        - name: abhaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: FHIR Bundle of encounters
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    SyncResource:
+      type: object
+      required:
+        - id
+        - resourceType
+        - json
+        - versionId
+      properties:
+        id:
+          type: string
+        resourceType:
+          type: string
+        json:
+          type: string
+          description: Serialized FHIR JSON payload
+        versionId:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+
+    SyncResult:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [ACCEPTED, CONFLICT]
+        serverVersion:
+          type: integer

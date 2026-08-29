@@ -1,0 +1,18 @@
+{
+  "registerPatient": "Register Patient",
+  "@registerPatient": {
+    "description": "Button text to register a new patient"
+  },
+  "syncData": "Sync Data",
+  "@syncData": {
+    "description": "Button text to sync offline data"
+  },
+  "vitalsEntry": "Vitals Entry",
+  "@vitalsEntry": {
+    "description": "Title for vitals entry form"
+  },
+  "createReferral": "Create Referral",
+  "@createReferral": {
+    "description": "Button text to refer patient"
+  }
+}
