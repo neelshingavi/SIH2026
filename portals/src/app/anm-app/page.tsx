@@ -16,6 +16,7 @@ interface Task {
   buttonLabel: string;
   buttonColor: string;
   completed: boolean;
+  encounterType: string;
 }
 
 interface HousePin {
@@ -28,11 +29,11 @@ interface HousePin {
 
 // ── Mock Data ──────────────────────────────────────────────────────────────
 const INITIAL_TASKS: Task[] = [
-  { id: 't1', category: 'High-Risk ANC Visits', categoryColor: '#ef4444', badge: '4 Overdue', badgeColor: '#ef4444', patient: 'Anita Shinde', details: '8th Month · High BP (150/95)', location: 'Wadi No. 3', buttonLabel: 'Mark Visited', buttonColor: '#ef4444', completed: false },
-  { id: 't2', category: 'High-Risk ANC Visits', categoryColor: '#ef4444', badge: '4 Overdue', badgeColor: '#ef4444', patient: 'Lata Pawar', details: '7th Month · Anaemia detected', location: 'Wadi No. 1', buttonLabel: 'Mark Visited', buttonColor: '#ef4444', completed: false },
-  { id: 't3', category: 'Chronic NCD Follow-ups', categoryColor: '#d97706', badge: '6 Due', badgeColor: '#f59e0b', patient: 'Ramesh M.', details: 'Diabetes Check · HbA1c due', location: 'Wadi No. 5', buttonLabel: 'Record Vitals', buttonColor: '#f59e0b', completed: false },
-  { id: 't4', category: 'Chronic NCD Follow-ups', categoryColor: '#d97706', badge: '6 Due', badgeColor: '#f59e0b', patient: 'Sunanda Raut', details: 'Hypertension · BP monitoring', location: 'Wadi No. 2', buttonLabel: 'Record Vitals', buttonColor: '#f59e0b', completed: false },
-  { id: 't5', category: 'Child Immunization Drops', categoryColor: '#059669', badge: '2 Pending', badgeColor: '#10b981', patient: '0–5 Yr Children', details: 'Polio drops · 8 children across 2 wadis', location: 'Wadi No. 1 & 4', buttonLabel: 'View List', buttonColor: '#10b981', completed: false },
+  { id: 't1', category: 'High-Risk ANC Visits', categoryColor: '#ef4444', badge: '4 Overdue', badgeColor: '#ef4444', patient: 'Anita Shinde', details: '8th Month · High BP (150/95)', location: 'Wadi No. 3', buttonLabel: 'Record Vitals', buttonColor: '#ef4444', completed: false, encounterType: 'ANC' },
+  { id: 't2', category: 'High-Risk ANC Visits', categoryColor: '#ef4444', badge: '4 Overdue', badgeColor: '#ef4444', patient: 'Lata Pawar', details: '7th Month · Anaemia detected', location: 'Wadi No. 1', buttonLabel: 'Record Vitals', buttonColor: '#ef4444', completed: false, encounterType: 'ANC' },
+  { id: 't3', category: 'Chronic NCD Follow-ups', categoryColor: '#d97706', badge: '6 Due', badgeColor: '#f59e0b', patient: 'Ramesh M.', details: 'Diabetes Check · HbA1c due', location: 'Wadi No. 5', buttonLabel: 'Record Vitals', buttonColor: '#f59e0b', completed: false, encounterType: 'General' },
+  { id: 't4', category: 'Chronic NCD Follow-ups', categoryColor: '#d97706', badge: '6 Due', badgeColor: '#f59e0b', patient: 'Sunanda Raut', details: 'Hypertension · BP monitoring', location: 'Wadi No. 2', buttonLabel: 'Record Vitals', buttonColor: '#f59e0b', completed: false, encounterType: 'General' },
+  { id: 't5', category: 'Child Immunization Drops', categoryColor: '#059669', badge: '2 Pending', badgeColor: '#10b981', patient: '0–5 Yr Children', details: 'Polio drops · 8 children across 2 wadis', location: 'Wadi No. 1 & 4', buttonLabel: 'Mark Visited', buttonColor: '#10b981', completed: false, encounterType: 'Immunization' },
 ];
 
 const HOUSE_PINS: HousePin[] = [
@@ -69,6 +70,13 @@ export default function AnmApp() {
   const [abhaStep, setAbhaStep] = useState(1);
   const [sosActive, setSosActive] = useState(false);
   const [activeSection, setActiveSection] = useState<'tasks' | 'map' | 'tools'>('tasks');
+  
+  // Triage state
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [vitals, setVitals] = useState({ spo2: '', sys: '', dia: '' });
+  const [triageResult, setTriageResult] = useState<any>(null);
+  const [triageLoading, setTriageLoading] = useState(false);
+
   const [tcForm, setTcForm] = useState({ patientName: '', condition: '', priority: 'routine' });
   const [tcStatus, setTcStatus] = useState<'idle'|'loading'|'success'>('idle');
 
@@ -76,8 +84,9 @@ export default function AnmApp() {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: true } : t));
   };
 
-  const requestTeleconsult = async () => {
-    if (!tcForm.patientName) return;
+  const requestTeleconsult = async (prefilledName?: string, prefilledCondition?: string, prefilledPriority?: string) => {
+    const pName = prefilledName || tcForm.patientName;
+    if (!pName) return;
     setTcStatus('loading');
     try {
       await fetch(`${API}/teleconsult/queue`, {
@@ -86,7 +95,9 @@ export default function AnmApp() {
         body: JSON.stringify({
           hubFacilityId: 'PHC-001',
           spokeFacilityId: 'Khed Sub-Centre',
-          ...tcForm,
+          patientName: pName,
+          condition: prefilledCondition || tcForm.condition,
+          priority: prefilledPriority || tcForm.priority,
         })
       });
       setTcStatus('success');
@@ -95,6 +106,50 @@ export default function AnmApp() {
     } catch {
       setTcStatus('idle');
     }
+  };
+
+  const evaluateTriage = async () => {
+    if (!selectedTask) return;
+    setTriageLoading(true);
+    try {
+      const res = await fetch(`${API}/triage/evaluate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: selectedTask.id,
+          encounterType: selectedTask.encounterType,
+          observations: [
+            { code: 'spo2', value: Number(vitals.spo2) || 98 },
+            { code: 'bp.systolic', value: Number(vitals.sys) || 120 },
+            { code: 'bp.diastolic', value: Number(vitals.dia) || 80 },
+          ]
+        })
+      });
+      const data = await res.json();
+      setTriageResult(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTriageLoading(false);
+    }
+  };
+
+  const handleTaskAction = (task: Task) => {
+    if (task.buttonLabel === 'Record Vitals') {
+      setSelectedTask(task);
+      setVitals({ spo2: '', sys: '', dia: '' });
+      setTriageResult(null);
+    } else {
+      markDone(task.id);
+    }
+  };
+
+  const handleEscalate = async () => {
+    if (!selectedTask || !triageResult) return;
+    const cond = triageResult.flags.length > 0 ? triageResult.flags.join(', ') : 'High Risk Triage';
+    await requestTeleconsult(selectedTask.patient, cond, triageResult.riskBand === 'EMERGENCY' ? 'high' : 'routine');
+    markDone(selectedTask.id);
+    setSelectedTask(null);
   };
 
   const pending = tasks.filter(t => !t.completed);
@@ -204,7 +259,7 @@ export default function AnmApp() {
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.2rem' }}>{task.details}</div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>📍 {task.location}</div>
                       <button
-                        onClick={() => markDone(task.id)}
+                        onClick={() => handleTaskAction(task)}
                         style={{ width: '100%', padding: '0.5rem', background: 'transparent', border: `1px solid ${task.buttonColor}`, color: task.buttonColor, borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '0.8125rem' }}
                       >{task.buttonLabel}</button>
                     </div>
@@ -475,6 +530,84 @@ export default function AnmApp() {
 
         </div>
       </div>
+
+      {/* Triage CDSS Modal */}
+      {selectedTask && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: '400px', background: 'white', borderTopLeftRadius: '16px', borderTopRightRadius: '16px', padding: '1.25rem', paddingBottom: '2.5rem', animation: 'slideUp 0.3s ease-out' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>Record Vitals (CDSS)</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Patient: {selectedTask.patient}</div>
+              </div>
+              <button onClick={() => setSelectedTask(null)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}>×</button>
+            </div>
+
+            {!triageResult ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.25rem' }}>SpO₂ (%)</label>
+                    <input type="number" value={vitals.spo2} onChange={e => setVitals(v => ({ ...v, spo2: e.target.value }))} placeholder="e.g. 98" style={{ width: '100%', padding: '0.625rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '0.25rem' }}>BP (Sys / Dia)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <input type="number" value={vitals.sys} onChange={e => setVitals(v => ({ ...v, sys: e.target.value }))} placeholder="120" style={{ width: '100%', padding: '0.625rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
+                      <span style={{ color: '#94a3b8' }}>/</span>
+                      <input type="number" value={vitals.dia} onChange={e => setVitals(v => ({ ...v, dia: e.target.value }))} placeholder="80" style={{ width: '100%', padding: '0.625rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={evaluateTriage} 
+                  disabled={triageLoading}
+                  style={{ width: '100%', background: '#0ea5e9', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.9375rem', cursor: triageLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {triageLoading ? 'Evaluating AI...' : 'Submit to AI Triage'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ padding: '1rem', borderRadius: '8px', background: triageResult.riskBand === 'EMERGENCY' ? '#fef2f2' : triageResult.riskBand === 'HIGH_RISK' ? '#fffbeb' : '#f0fdf4', border: `1px solid ${triageResult.riskBand === 'EMERGENCY' ? '#fca5a5' : triageResult.riskBand === 'HIGH_RISK' ? '#fde68a' : '#86efac'}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1.25rem' }}>{triageResult.riskBand === 'EMERGENCY' ? '🚨' : triageResult.riskBand === 'HIGH_RISK' ? '⚠️' : '✅'}</span>
+                    <span style={{ fontWeight: 700, color: triageResult.riskBand === 'EMERGENCY' ? '#dc2626' : triageResult.riskBand === 'HIGH_RISK' ? '#d97706' : '#16a34a' }}>
+                      {triageResult.riskBand.replace('_', ' ')}
+                    </span>
+                  </div>
+                  {triageResult.flags.length > 0 && (
+                    <ul style={{ margin: '0 0 0.5rem 1.25rem', padding: 0, fontSize: '0.8rem', color: '#1e293b' }}>
+                      {triageResult.flags.map((f: string, i: number) => <li key={i}>{f}</li>)}
+                    </ul>
+                  )}
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Action: {triageResult.recommendedAction.replace(/_/g, ' ')}</div>
+                </div>
+
+                {triageResult.riskBand !== 'NORMAL' ? (
+                  <button 
+                    onClick={handleEscalate}
+                    style={{ width: '100%', background: '#ef4444', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <span>🚑</span> Escalate to MO (Live Consult)
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => { markDone(selectedTask.id); setSelectedTask(null); }}
+                    style={{ width: '100%', background: '#10b981', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer' }}
+                  >
+                    Mark Task Complete
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <style>{`
+            @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+          `}</style>
+        </div>
+      )}
     </Shell>
   );
 }
