@@ -51,10 +51,51 @@ export class AbdmMockService {
             subject: {
               reference: "Patient/mock-patient",
               display: `Patient with ABHA ${abhaId}`
-            }
+            },
+            title: "Longitudinal Care Record"
           }
         },
-        // In a real scenario, we'd include Encounter, Observation, etc. here.
+        {
+          fullUrl: "urn:uuid:mock-encounter-1",
+          resource: {
+            resourceType: "Encounter",
+            status: "finished",
+            class: { code: "AMB", display: "ambulatory" },
+            period: { start: "2025-05-06T10:00:00Z" },
+            reasonCode: [{ coding: [{ display: "Hypertension follow-up" }] }]
+          }
+        },
+        {
+          fullUrl: "urn:uuid:mock-encounter-2",
+          resource: {
+            resourceType: "Encounter",
+            status: "finished",
+            class: { code: "AMB", display: "ambulatory" },
+            period: { start: "2025-04-22T09:30:00Z" },
+            reasonCode: [{ coding: [{ display: "Fever, URTI" }] }]
+          }
+        },
+        {
+          fullUrl: "urn:uuid:mock-observation-bp",
+          resource: {
+            resourceType: "Observation",
+            status: "final",
+            category: [{ coding: [{ code: "vital-signs", display: "Vital Signs" }] }],
+            code: { coding: [{ display: "Blood Pressure" }] },
+            valueString: "140/90 mmHg",
+            effectiveDateTime: "2025-05-06T10:05:00Z"
+          }
+        },
+        {
+          fullUrl: "urn:uuid:mock-medication",
+          resource: {
+            resourceType: "MedicationRequest",
+            status: "active",
+            intent: "order",
+            medicationCodeableConcept: { coding: [{ display: "Amlodipine 5mg Tablet" }] },
+            dosageInstruction: [{ text: "1 tablet daily" }]
+          }
+        }
       ]
     };
   }

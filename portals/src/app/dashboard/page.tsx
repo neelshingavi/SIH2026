@@ -25,6 +25,21 @@ export default function MODashboard() {
   const [teleconsultQueue, setTeleconsultQueue] = useState<Teleconsult[]>([]);
   const [activeCall, setActiveCall] = useState<Teleconsult | null>(null);
 
+  // EMR State
+  const [emrSearch, setEmrSearch] = useState('');
+  const [emrPatient, setEmrPatient] = useState<any>(null);
+  const [emrHistory, setEmrHistory] = useState<any[]>([]);
+  const [emrLoading, setEmrLoading] = useState(false);
+
+  // Prescription State
+  const [prescriptions, setPrescriptions] = useState<any[]>([
+    { id: 1, name: 'Tab. Amlodipine 5mg', dose: '1', freq: 'OD (Morning)', duration: '30 Days' },
+    { id: 2, name: 'Tab. Telmisartan 40mg', dose: '1', freq: 'OD (Morning)', duration: '30 Days' }
+  ]);
+  const [advice, setAdvice] = useState('Low salt diet, regular exercise, BP monitoring.');
+  const [rxSent, setRxSent] = useState(false);
+  const [stockRequested, setStockRequested] = useState(false);
+
   useEffect(() => {
     const fetchQ = async () => {
       try {
@@ -44,6 +59,47 @@ export default function MODashboard() {
 
   const activeQueue = teleconsultQueue.filter(q => q.status !== 'COMPLETED');
   const completedQueue = teleconsultQueue.filter(q => q.status === 'COMPLETED');
+
+  // Fetch ABDM Care Context
+  const handleEmrSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && emrSearch.trim() !== '') {
+      setEmrLoading(true);
+      try {
+        const res = await fetch(`${API}/abdm-mock/care-context/${emrSearch}`);
+        const bundle = await res.json();
+        
+        // Parse mock bundle
+        const patientEntry = bundle.entry.find((e: any) => e.resource.resourceType === 'Composition');
+        const encounters = bundle.entry.filter((e: any) => e.resource.resourceType === 'Encounter');
+        
+        setEmrPatient({
+          abha: emrSearch,
+          name: patientEntry?.resource?.subject?.display?.replace('Patient with ABHA ', '') || 'Unknown Patient',
+        });
+        
+        const history = encounters.map((enc: any) => {
+          const date = new Date(enc.resource.period.start).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          const reason = enc.resource.reasonCode?.[0]?.coding?.[0]?.display || 'Visit';
+          return { date, note: reason };
+        });
+        
+        setEmrHistory(history);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setEmrLoading(false);
+      }
+    }
+  };
+
+  const handleSendRx = () => {
+    setRxSent(true);
+    setTimeout(() => {
+      setPrescriptions([]);
+      setAdvice('');
+      setRxSent(false);
+    }, 2000);
+  };
 
   return (
     <Shell
@@ -192,32 +248,88 @@ export default function MODashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { name: 'Tab. Amlodipine 5mg', freq: 'OD (Morning)' },
-                      { name: 'Tab. Telmisartan 40mg', freq: 'OD (Morning)' },
-                    ].map((rx, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
-                        <td style={{ padding: '0.5rem 0', color: '#0ea5e9', fontWeight: 500 }}>{rx.name}</td>
-                        <td><input defaultValue="1" style={{ width: '28px', padding: '3px', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} /></td>
+                    {prescriptions.map((rx, i) => (
+                      <tr key={rx.id} style={{ borderBottom: '1px solid #f8fafc' }}>
+                        <td style={{ padding: '0.5rem 0', color: '#0ea5e9', fontWeight: 500 }}>
+                          <input 
+                            value={rx.name} 
+                            onChange={(e) => {
+                              const newRx = [...prescriptions];
+                              newRx[i].name = e.target.value;
+                              setPrescriptions(newRx);
+                            }}
+                            style={{ width: '100%', padding: '3px', border: 'none', background: 'transparent', color: '#0ea5e9', fontWeight: 500 }} 
+                            placeholder="Medicine Name"
+                          />
+                        </td>
                         <td>
-                          <select style={{ padding: '3px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.7rem' }}>
-                            <option>{rx.freq}</option>
+                          <input 
+                            value={rx.dose}
+                            onChange={(e) => {
+                              const newRx = [...prescriptions];
+                              newRx[i].dose = e.target.value;
+                              setPrescriptions(newRx);
+                            }}
+                            style={{ width: '28px', padding: '3px', border: '1px solid #cbd5e1', borderRadius: '4px', textAlign: 'center' }} 
+                          />
+                        </td>
+                        <td>
+                          <select 
+                            value={rx.freq}
+                            onChange={(e) => {
+                              const newRx = [...prescriptions];
+                              newRx[i].freq = e.target.value;
+                              setPrescriptions(newRx);
+                            }}
+                            style={{ padding: '3px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.7rem' }}>
+                            <option>OD (Morning)</option>
+                            <option>BD (Twice a day)</option>
+                            <option>TDS (Thrice a day)</option>
+                            <option>SOS (As needed)</option>
                           </select>
                         </td>
                         <td>
-                          <select style={{ padding: '3px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.7rem' }}>
+                          <select 
+                            value={rx.duration}
+                            onChange={(e) => {
+                              const newRx = [...prescriptions];
+                              newRx[i].duration = e.target.value;
+                              setPrescriptions(newRx);
+                            }}
+                            style={{ padding: '3px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.7rem' }}>
+                            <option>3 Days</option>
+                            <option>5 Days</option>
+                            <option>7 Days</option>
+                            <option>15 Days</option>
                             <option>30 Days</option>
                           </select>
                         </td>
-                        <td style={{ color: '#ef4444', cursor: 'pointer', textAlign: 'right' }}>🗑️</td>
+                        <td 
+                          style={{ color: '#ef4444', cursor: 'pointer', textAlign: 'right' }}
+                          onClick={() => setPrescriptions(prescriptions.filter(p => p.id !== rx.id))}
+                        >🗑️</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                <div style={{ color: '#0ea5e9', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', marginBottom: '1rem' }} onClick={() => setPrescriptions([...prescriptions, { id: Date.now(), name: '', dose: '1', freq: 'OD (Morning)', duration: '5 Days' }])}>
+                  + Add Medicine
+                </div>
+                
                 <div style={{ fontSize: '0.65rem', fontWeight: 600, color: '#64748b', marginBottom: '0.25rem' }}>ADVICE</div>
-                <input defaultValue="Low salt diet, regular exercise, BP monitoring." style={{ width: '100%', padding: '0.375rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.75rem', marginBottom: '0.75rem', boxSizing: 'border-box' }} />
+                <input 
+                  value={advice}
+                  onChange={(e) => setAdvice(e.target.value)}
+                  placeholder="Additional advice for patient..."
+                  style={{ width: '100%', padding: '0.375rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.75rem', marginBottom: '0.75rem', boxSizing: 'border-box' }} 
+                />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: 'auto' }}>
-                  <button style={{ padding: '0.5rem 0.875rem', background: '#0ea5e9', border: 'none', color: 'white', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '0.8125rem' }}>Send Prescription</button>
+                  <button 
+                    onClick={handleSendRx}
+                    disabled={rxSent || prescriptions.length === 0}
+                    style={{ padding: '0.5rem 0.875rem', background: rxSent ? '#10b981' : '#0ea5e9', border: 'none', color: 'white', borderRadius: '6px', fontWeight: 600, cursor: rxSent ? 'default' : 'pointer', fontSize: '0.8125rem', transition: 'background 0.2s' }}>
+                    {rxSent ? '✓ Sent to EMR' : 'Send Prescription'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -253,32 +365,55 @@ export default function MODashboard() {
               <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
                 <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.625rem' }}>Longitudinal Record</div>
                 <div style={{ position: 'relative' }}>
-                  <input placeholder="Search ABHA ID" style={{ width: '100%', padding: '0.375rem 0.375rem 0.375rem 1.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.75rem', boxSizing: 'border-box' }} />
+                  <input 
+                    value={emrSearch}
+                    onChange={(e) => setEmrSearch(e.target.value)}
+                    onKeyDown={handleEmrSearch}
+                    placeholder="Search ABHA ID (Press Enter)" 
+                    style={{ width: '100%', padding: '0.375rem 0.375rem 0.375rem 1.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.75rem', boxSizing: 'border-box' }} 
+                  />
                   <span style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.875rem' }}>🔍</span>
                 </div>
               </div>
-              <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.25rem', flexShrink: 0 }}>👤</div>
-                <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{activeCall?.patientName || 'Savitri Shankar'}</div>
-                  <div style={{ fontSize: '0.65rem', color: '#64748b', lineHeight: 1.5 }}>
-                    ABHA-1234-5678-9101 · Female · 38 Y<br />
-                    9876543210
+              
+              {emrLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>Fetching ABDM Care Context...</div>
+              ) : emrPatient ? (
+                <>
+                  <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                    <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.25rem', flexShrink: 0 }}>👤</div>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{emrPatient.name}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#64748b', lineHeight: 1.5 }}>
+                        {emrPatient.abha} · Verified ABHA<br />
+                        Data via ABDM HIE
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '0.875rem 1rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Visit History</div>
+                    {emrHistory.map((v, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.625rem', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                        <div style={{ color: '#94a3b8', width: '45px', flexShrink: 0 }}>{v.date}</div>
+                        <div style={{ color: '#64748b' }}>{v.note}</div>
+                      </div>
+                    ))}
+                    {emrHistory.length === 0 && <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>No records found.</div>}
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: '0.875rem 1rem', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                  <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.25rem', flexShrink: 0 }}>👤</div>
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>{activeCall?.patientName || 'Savitri Shankar'}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#64748b', lineHeight: 1.5 }}>
+                      ABHA-1234-5678-9101 · Female · 38 Y<br />
+                      9876543210
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '0.875rem 1rem' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Visit History</div>
-                {[
-                  { date: '06 May', note: 'Hypertension – Amlodipine' },
-                  { date: '22 Apr', note: 'Fever, URTI' },
-                ].map((v, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '0.625rem', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-                    <div style={{ color: '#94a3b8', width: '45px', flexShrink: 0 }}>{v.date}</div>
-                    <div style={{ color: '#64748b' }}>{v.note}</div>
-                  </div>
-                ))}
-              </div>
+              )}
+            </div>
             </div>
           </div>
         </div>
@@ -294,7 +429,12 @@ export default function MODashboard() {
                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Current Stock: 27 Tablets</div>
               </div>
             </div>
-            <button style={{ background: '#0f766e', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '0.8125rem' }}>Request Stock</button>
+            <button 
+              onClick={() => setStockRequested(true)}
+              disabled={stockRequested}
+              style={{ background: stockRequested ? '#10b981' : '#0f766e', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: 600, cursor: stockRequested ? 'default' : 'pointer', fontSize: '0.8125rem', transition: 'background 0.2s' }}>
+              {stockRequested ? 'Indent Requested ✓' : 'Request Stock'}
+            </button>
           </div>
         </div>
 
