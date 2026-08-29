@@ -1,33 +1,37 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Shell from '@/components/Shell';
 
+const API = 'http://localhost:3001';
+
 export default function BlockDashboardPage() {
-  const KPIS = [
-    { title: 'PHCs Monitored', value: '12', sub: 'All PHCs reporting', trend: '↑ 12% vs last month', trendUp: true, icon: '🏥', color: '#0f766e' },
-    { title: 'Avg Referral Completion', value: '71%', target: 'Target: 80%', trend: '↓ 6% vs last month', trendUp: false, icon: '🔄', color: '#0ea5e9' },
-    { title: 'Median Diagnostic TAT', value: '21 hrs', target: 'Target: ≤ 24 hrs', trend: '↓ 3 hrs vs last month', trendUp: true, icon: '⏱️', color: '#8b5cf6' },
-    { title: 'Stock Availability', value: '86%', target: 'Target: ≥ 90%', trend: '↓ 4% vs last month', trendUp: false, icon: '📦', color: '#10b981' },
-    { title: 'SLA Breaches', value: '4', sub: 'Pending resolution', trend: '↑ 2 new vs last month', trendUp: false, icon: '⚠️', color: '#ef4444' },
-  ];
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const CRITICAL_ACTIONS = [
-    { issue: 'SLA Breach: Referral completion > 48 hrs', phc: 'Kondhwa PHC', date: '25 May 2025 09:15 AM' },
-    { issue: 'Diagnostic TAT breach: CBP > 24 hrs', phc: 'Haveli PHC', date: '25 May 2025 08:40 AM' },
-    { issue: 'Stock out: Paracetamol 500mg', phc: 'Bhor PHC', date: '25 May 2025 07:50 AM' },
-    { issue: 'Lab reports pending validation > 48 hrs', phc: 'Shirur PHC', date: '25 May 2025 07:20 AM' },
-  ];
-
-  const REFERRAL_BARS = [
-    { phc: 'Kondhwa PHC', pct: 92, color: '#0f766e' },
-    { phc: 'Haveli PHC', pct: 67, color: '#f59e0b' },
-    { phc: 'Bhor PHC', pct: 54, color: '#ef4444' },
-    { phc: 'Shirur PHC', pct: 76, color: '#f59e0b' },
-    { phc: 'Daund PHC', pct: 83, color: '#0f766e' },
-    { phc: 'Mulshi PHC', pct: 61, color: '#ef4444' },
-  ];
+  useEffect(() => {
+    fetch(`${API}/analytics/dashboard`)
+      .then(res => res.json())
+      .then(d => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
 
   const s = { card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' } as React.CSSProperties };
+
+  if (loading || !data) {
+    return (
+      <Shell title="Block Command Centre" subtitle="Pune Block, Maharashtra" user="Admin User" role="Block Admin" facility="Pune Block | Maharashtra">
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading dashboard metrics...</div>
+      </Shell>
+    );
+  }
+
+  const { kpis = [], criticalActions = [], referralBars = [], abdmStatus = [] } = data;
 
   return (
     <Shell title="Block Command Centre" subtitle="Pune Block, Maharashtra" user="Admin User" role="Block Admin" facility="Pune Block | Maharashtra">
@@ -35,7 +39,7 @@ export default function BlockDashboardPage() {
 
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
-          {KPIS.map((kpi, i) => (
+          {kpis.map((kpi: any, i: number) => (
             <div key={i} style={{ ...s.card, padding: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '1.25rem' }}>{kpi.icon}</span>
@@ -94,7 +98,7 @@ export default function BlockDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {CRITICAL_ACTIONS.map((a, i) => (
+                  {criticalActions.map((a: any, i: number) => (
                     <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
                       <td style={{ padding: '0.75rem 0.875rem' }}>
                         <span style={{ color: '#ef4444', background: '#fee2e2', border: '1px solid #fca5a5', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 600 }}>⚠️ High</span>
@@ -119,7 +123,7 @@ export default function BlockDashboardPage() {
           <div style={{ ...s.card, padding: '1rem' }}>
             <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.875rem', marginBottom: '0.875rem' }}>PHC Referral Performance (vs Target) ⓘ</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.65rem', color: '#3b82f6', marginBottom: '0.75rem' }}>--- Target (80%)</div>
-            {REFERRAL_BARS.map((b) => (
+            {referralBars.map((b: any) => (
               <div key={b.phc} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem', fontSize: '0.75rem' }}>
                 <div style={{ width: '80px', color: '#64748b', textAlign: 'right', flexShrink: 0 }}>{b.phc.replace(' PHC', '')}</div>
                 <div style={{ flex: 1, background: '#f1f5f9', borderRadius: '3px', height: '12px', position: 'relative' }}>
@@ -157,11 +161,7 @@ export default function BlockDashboardPage() {
               <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.875rem' }}>ABDM Integration Status</div>
               <div style={{ fontSize: '0.7rem', color: '#0ea5e9', fontWeight: 600, cursor: 'pointer' }}>View Details</div>
             </div>
-            {[
-              { icon: '🪪', label: 'ABHA Linked Patients', value: '5,432', sub: '72% of estimated population', trend: '+8%', up: true },
-              { icon: '🔗', label: 'Health Facilities Onboarded', value: '12 / 12', sub: '100% of PHCs', trend: 'No change', up: true },
-              { icon: '📄', label: 'Health Record Transactions', value: '18,765', sub: 'In last 30 days', trend: '+12%', up: true },
-            ].map((item, i) => (
+            {abdmStatus.map((item: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{ width: '36px', height: '36px', background: '#f0fdf4', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', flexShrink: 0 }}>{item.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
