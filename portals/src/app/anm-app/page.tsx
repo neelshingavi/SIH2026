@@ -77,6 +77,12 @@ export default function AnmApp() {
   const [triageResult, setTriageResult] = useState<any>(null);
   const [triageLoading, setTriageLoading] = useState(false);
 
+  // ABHA State
+  const [abhaAadhaar, setAbhaAadhaar] = useState('');
+  const [abhaOtp, setAbhaOtp] = useState('');
+  const [abhaGeneratedId, setAbhaGeneratedId] = useState('');
+  const [abhaLoading, setAbhaLoading] = useState(false);
+
   const [tcForm, setTcForm] = useState({ patientName: '', condition: '', priority: 'routine' });
   const [tcStatus, setTcStatus] = useState<'idle'|'loading'|'success'>('idle');
 
@@ -150,6 +156,20 @@ export default function AnmApp() {
     await requestTeleconsult(selectedTask.patient, cond, triageResult.riskBand === 'EMERGENCY' ? 'high' : 'routine');
     markDone(selectedTask.id);
     setSelectedTask(null);
+  };
+
+  const generateAbha = async () => {
+    setAbhaLoading(true);
+    try {
+      const res = await fetch(`${API}/abdm-mock/abha/create`, { method: 'POST' });
+      const data = await res.json();
+      setAbhaGeneratedId(data.abhaId);
+      setAbhaStep(5); // Success step
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAbhaLoading(false);
+    }
   };
 
   const pending = tasks.filter(t => !t.completed);
@@ -465,24 +485,83 @@ export default function AnmApp() {
 
                   {/* Fields */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Aadhaar Verification</span>
-                      <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, background: '#ecfdf5', padding: '2px 8px', borderRadius: '4px' }}>✔ Verified</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Name</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>Savitri Kale</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Date of Birth</span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>12 / 08 / 1985</span>
-                    </div>
-                    <button
-                      onClick={() => setAbhaStep(ABHA_STEPS.length)}
-                      style={{ width: '100%', background: '#0f766e', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', marginTop: '0.25rem' }}
-                    >
-                      🪪 Create ABHA ID
-                    </button>
+                    {abhaStep === 1 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', animation: 'fadeIn 0.3s' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e293b' }}>Enter 12-Digit Aadhaar Number</div>
+                        <input value={abhaAadhaar} onChange={e => setAbhaAadhaar(e.target.value)} placeholder="XXXX XXXX XXXX" style={{ padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '1rem', letterSpacing: '2px', textAlign: 'center' }} />
+                        <button onClick={() => setAbhaStep(2)} disabled={abhaAadhaar.length < 12} style={{ background: '#0f766e', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 700, cursor: abhaAadhaar.length < 12 ? 'not-allowed' : 'pointer', opacity: abhaAadhaar.length < 12 ? 0.5 : 1 }}>Request OTP</button>
+                      </div>
+                    )}
+
+                    {abhaStep === 2 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', animation: 'fadeIn 0.3s' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e293b' }}>Enter 6-Digit OTP Sent to Mobile</div>
+                        <input value={abhaOtp} onChange={e => setAbhaOtp(e.target.value)} placeholder="000000" style={{ padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '1.25rem', letterSpacing: '8px', textAlign: 'center' }} />
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => setAbhaStep(1)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Back</button>
+                          <button onClick={() => setAbhaStep(3)} disabled={abhaOtp.length < 6} style={{ flex: 2, background: '#0f766e', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 700, cursor: abhaOtp.length < 6 ? 'not-allowed' : 'pointer', opacity: abhaOtp.length < 6 ? 0.5 : 1 }}>Verify OTP</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {abhaStep === 3 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', animation: 'fadeIn 0.3s' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Aadhaar KYC</span>
+                          <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, background: '#ecfdf5', padding: '2px 8px', borderRadius: '4px' }}>✔ Verified</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Name</span>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>Savitri Kale</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Date of Birth</span>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>12 / 08 / 1985</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                          <button onClick={() => setAbhaStep(2)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Back</button>
+                          <button onClick={() => setAbhaStep(4)} style={{ flex: 2, background: '#0f766e', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>Confirm Details</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {abhaStep === 4 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.3s', textAlign: 'center', padding: '1rem' }}>
+                        <div style={{ fontSize: '2rem' }}>🎉</div>
+                        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>Ready to Generate ABHA ID</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Consent successfully recorded. Tap below to create the unique 14-digit Ayushman Bharat Health Account.</div>
+                        <button
+                          onClick={generateAbha}
+                          disabled={abhaLoading}
+                          style={{ width: '100%', background: '#0ea5e9', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.9375rem', cursor: abhaLoading ? 'not-allowed' : 'pointer' }}
+                        >
+                          {abhaLoading ? 'Creating...' : '🪪 Create ABHA ID'}
+                        </button>
+                      </div>
+                    )}
+
+                    {abhaStep === 5 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.3s' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', borderRadius: '12px', padding: '1.25rem', color: 'white', position: 'relative', overflow: 'hidden' }}>
+                          <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '6rem', opacity: 0.1 }}>🪪</div>
+                          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: '0.25rem', opacity: 0.9 }}>Ayushman Bharat Health Account</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem' }}>Savitri Kale</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                            <div>
+                              <div style={{ fontSize: '0.65rem', opacity: 0.8, marginBottom: '0.125rem' }}>ABHA Number</div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '1px' }}>{abhaGeneratedId}</div>
+                            </div>
+                            <div style={{ background: 'white', padding: '4px', borderRadius: '4px' }}>
+                              <img src="https://api.qrserver.com/v1/create-qr-code/?size=50x50&data=ABHA:1234" alt="QR" style={{ width: '40px', height: '40px' }} />
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => { setAbhaStep(1); setAbhaAadhaar(''); setAbhaOtp(''); setAbhaGeneratedId(''); }} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Start Over</button>
+                          <button onClick={() => alert('ABHA Number Copied!')} style={{ flex: 1, background: '#10b981', color: 'white', border: 'none', padding: '0.75rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>Copy ID</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
