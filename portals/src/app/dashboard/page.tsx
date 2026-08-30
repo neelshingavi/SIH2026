@@ -3,7 +3,10 @@ import React, { useState, useEffect } from 'react';
 import Shell from '@/components/Shell';
 
 const s = {
-  card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' } as React.CSSProperties,
+  card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' } as React.CSSProperties,
+  label: { fontSize: '0.65rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' } as React.CSSProperties,
+  value: { fontSize: '0.875rem', fontWeight: 500, color: '#1e293b' } as React.CSSProperties,
+  tab: (active: boolean) => ({ padding: '0.625rem 1rem', border: 'none', background: active ? '#0f766e' : 'transparent', color: active ? 'white' : '#64748b', fontWeight: 600, fontSize: '0.875rem', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s' })
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -48,6 +51,37 @@ export default function MODashboard() {
   const [rxSent, setRxSent] = useState(false);
   const [stockRequested, setStockRequested] = useState(false);
   const [lowestStock, setLowestStock] = useState<any>(null);
+
+  // Digitizer State
+  const [digiFile, setDigiFile] = useState<File | null>(null);
+  const [digiStatus, setDigiStatus] = useState<'IDLE'|'SCANNING'|'DONE'>('IDLE');
+  const [digiFhir, setDigiFhir] = useState<string>('');
+
+  const handleSimulateScan = () => {
+    if (!digiFile) return;
+    setDigiStatus('SCANNING');
+    setTimeout(() => {
+      setDigiStatus('DONE');
+      setDigiFhir(JSON.stringify({
+        resourceType: "Bundle",
+        type: "transaction",
+        entry: [
+          {
+            resource: {
+              resourceType: "MedicationRequest",
+              status: "active",
+              intent: "order",
+              medicationCodeableConcept: {
+                coding: [{ system: "http://snomed.info/sct", code: "374249007", display: "Paracetamol 500mg" }]
+              },
+              subject: { reference: "Patient/123", display: "Unknown Patient from Paper" },
+              dosageInstruction: [{ text: "Take 1 tablet every 8 hours for fever" }]
+            }
+          }
+        ]
+      }, null, 2));
+    }, 2500);
+  };
 
   useEffect(() => {
     const fetchQ = async () => {
@@ -395,20 +429,16 @@ export default function MODashboard() {
           {/* RIGHT: Vitals + EMR Tabs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
             <div style={{ ...s.card, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
-                {[
-                  { id: 'emr', label: 'Record' },
-                  { id: 'diagnostics', label: 'Labs' }
-                ].map(t => (
-                  <div key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 600, color: activeTab === t.id ? '#0ea5e9' : '#64748b', borderBottom: activeTab === t.id ? '2px solid #0ea5e9' : 'none', cursor: 'pointer' }}>
-                    {t.label}
-                  </div>
-                ))}
+              <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', gap: '0.5rem', padding: '0.5rem' }}>
+                <button onClick={() => setActiveTab('emr')} style={s.tab(activeTab === 'emr')}>EMR &amp; Prescription</button>
+                <button onClick={() => setActiveTab('diagnostics')} style={s.tab(activeTab === 'diagnostics')}>Diagnostics (LIMS)</button>
+                <button onClick={() => setActiveTab('digitize')} style={{ ...s.tab(activeTab === 'digitize'), background: activeTab === 'digitize' ? '#8b5cf6' : 'transparent', color: activeTab === 'digitize' ? 'white' : '#8b5cf6', border: activeTab !== 'digitize' ? '1px solid #8b5cf6' : 'none' }}>
+                  ✨ AI Digitizer
+                </button>
               </div>
 
-              {activeTab === 'emr' ? (
+              {activeTab === 'emr' && (
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {/* EMR Content */}
                   <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.625rem' }}>Longitudinal Record</div>
                     <div style={{ position: 'relative' }}>
@@ -436,7 +466,9 @@ export default function MODashboard() {
                     ))}
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {activeTab === 'diagnostics' && (
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                     <div style={{ fontWeight: 600 }}>Lab Orders</div>
@@ -451,6 +483,87 @@ export default function MODashboard() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {activeTab === 'digitize' && (
+                <div style={{ flex: 1, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ padding: '0 0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>Legacy Record Digitization</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.125rem' }}>Extract structured FHIR from paper prescriptions via Vision AI</div>
+                  </div>
+                  
+                  <div style={{ 
+                    flex: 1, border: '2px dashed #cbd5e1', borderRadius: '12px', background: '#f8fafc', 
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+                    cursor: 'pointer', position: 'relative', overflow: 'hidden' 
+                  }}
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.onchange = (e: any) => setDigiFile(e.target.files[0]);
+                      input.click();
+                    }}
+                  >
+                    {digiFile ? (
+                      <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 600 }}>
+                        <span style={{ fontSize: '3rem' }}>📄</span>
+                        <div style={{ marginTop: '0.5rem' }}>{digiFile.name} Loaded</div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: '#64748b' }}>
+                        <span style={{ fontSize: '2.5rem' }}>📸</span>
+                        <div style={{ fontWeight: 600, marginTop: '0.5rem' }}>Upload Paper Record</div>
+                      </div>
+                    )}
+                    {digiStatus === 'SCANNING' && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(139,92,246,0.2)', position: 'absolute', top: 0, animation: 'scan 1.5s infinite linear' }}>
+                          <div style={{ height: '100%', background: '#8b5cf6', boxShadow: '0 0 10px #8b5cf6' }}></div>
+                        </div>
+                        <div style={{ color: '#8b5cf6', fontWeight: 700, fontSize: '1rem' }}>Extracting Clinical NLP...</div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button 
+                      onClick={handleSimulateScan} 
+                      disabled={!digiFile || digiStatus === 'SCANNING'}
+                      style={{ 
+                        flex: 1, padding: '0.75rem', background: !digiFile ? '#e2e8f0' : '#8b5cf6', 
+                        color: !digiFile ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', 
+                        fontWeight: 600, cursor: !digiFile ? 'not-allowed' : 'pointer' 
+                      }}
+                    >
+                      {digiStatus === 'SCANNING' ? 'Processing...' : 'Run Vision AI Scan'}
+                    </button>
+                    {digiStatus === 'DONE' && (
+                      <button style={{ padding: '0.75rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                        Save to EMR
+                      </button>
+                    )}
+                  </div>
+
+                  {digiStatus === 'DONE' && (
+                    <div style={{ flex: 1, background: '#1e293b', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <div style={{ color: 'white', fontWeight: 600, fontSize: '0.75rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                        Structured FHIR R4 Output
+                        <span style={{ color: '#10b981' }}>✓ Extracted</span>
+                      </div>
+                      <pre style={{ margin: 0, flex: 1, overflowY: 'auto', color: '#38bdf8', fontSize: '0.65rem', fontFamily: 'monospace' }}>
+                        {digiFhir}
+                      </pre>
+                    </div>
+                  )}
+                  
+                  <style dangerouslySetInnerHTML={{__html: `
+                    @keyframes scan {
+                      0% { top: 0; }
+                      50% { top: 100%; }
+                      100% { top: 0; }
+                    }
+                  `}} />
                 </div>
               )}
             </div>
