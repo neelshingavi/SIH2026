@@ -1,32 +1,29 @@
-import { Controller, Post, Body, Get, Query, Patch, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
 import { TeleconsultService } from './teleconsult.service.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
 @Controller('teleconsult')
+@UseGuards(JwtAuthGuard)
 export class TeleconsultController {
   constructor(private readonly teleconsultService: TeleconsultService) {}
 
   @Post('token')
-  async getToken(@Body() body: { roomName: string; participantName: string; isDoctor: boolean }) {
-    return this.teleconsultService.createToken(body.roomName, body.participantName, body.isDoctor);
+  async getToken(@Body() body: { taskId: string }, @Req() req: any) {
+    return this.teleconsultService.createToken(body.taskId, req.user, req.correlationId);
   }
 
-  @Get('queue')
-  getQueue(@Query('hubFacilityId') hubFacilityId: string) {
-    return this.teleconsultService.getQueue(hubFacilityId);
+  @Get('waiting-room')
+  getWaitingRoom(@Req() req: any) {
+    return this.teleconsultService.getWaitingRoom(req.user.facilityId);
   }
 
-  @Post('queue')
-  createRequest(@Body() body: { hubFacilityId: string; spokeFacilityId: string; patientName: string; condition: string; priority: string }) {
-    return this.teleconsultService.createRequest(body);
-  }
-
-  @Patch('queue/:id/status')
-  updateStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.teleconsultService.updateStatus(id, status);
-  }
-
-  @Post('seed')
-  seed(@Query('hubFacilityId') hubFacilityId: string) {
-    return this.teleconsultService.seed(hubFacilityId);
+  @Post(':id/complete')
+  async completeConsultation(
+    @Param('id') id: string,
+    @Body('notes') notes: string,
+    @Req() req: any
+  ) {
+    return this.teleconsultService.completeConsultation(id, notes, req.user, req.correlationId);
   }
 }
+

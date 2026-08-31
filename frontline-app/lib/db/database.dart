@@ -1,61 +1,104 @@
-import 'dart:async';
-import 'package:path/path.dart';
-import 'package:sqflite/sqflite.dart';
+import 'dart:io';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
-class DatabaseHelper {
-  static final DatabaseHelper instance = DatabaseHelper._init();
-  static Database? _database;
+part 'database.g.dart';
 
-  DatabaseHelper._init();
+@TableIndex(name: 'idx_resource_type', columns: {#resourceType})
+@TableIndex(name: 'idx_sync_status', columns: {#syncStatus})
+class LocalResources extends Table {
+  TextColumn get id => text()(); 
+  TextColumn get resourceType => text()(); 
+  TextColumn get jsonPayload => text()(); 
+  IntColumn get versionId => integer().withDefault(const Constant(1))();
+  TextColumn get syncStatus => text().withDefault(const Constant('PENDING'))(); 
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get createdBy => text().nullable()(); 
+  TextColumn get deviceId => text().nullable()(); 
+  TextColumn get facilityId => text().nullable()(); 
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('setu_frontline.db');
-    return _database!;
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@TableIndex(name: 'idx_status_next_retry', columns: {#status, #nextRetryTimestamp})
+class SyncOperations extends Table {
+  TextColumn get id => text()(); 
+  TextColumn get resourceId => text()(); 
+  TextColumn get resourceType => text()(); 
+  TextColumn get operation => text()(); 
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  IntColumn get retryCount => integer().withDefault(const Constant(0))();
+  DateTimeColumn get nextRetryTimestamp => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get status => text().withDefault(const Constant('PENDING'))(); 
+  TextColumn get lastError => text().nullable()();
+  TextColumn get idempotencyKey => text()(); 
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [LocalResources, SyncOperations])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  @override
+  int get schemaVersion => 1;
+
+  Future<List<SyncOperation>> getPendingOperations() {
+    final now = DateTime.now();
+    return (select(syncOperations)
+      ..where((t) => (t.status.equals('PENDING') | t.status.equals('FAILED')) & t.nextRetryTimestamp.isSmallerOrEqualValue(now))
+      ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc)]))
+    .get();
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+  Future<void> markOperationFailed(String id, String error, int currentRetryCount) {
+    // Exponential backoff: 2^retryCount * 5 seconds (Max 1 hour)
+    final delaySeconds = (1 << currentRetryCount) * 5;
+    final cappedDelay = delaySeconds > 3600 ? 3600 : delaySeconds;
+    final nextRetry = DateTime.now().add(Duration(seconds: cappedDelay));
 
-    return await openDatabase(
-      path,
-      version: 2,
-      onCreate: _createDB,
-      onUpgrade: _upgradeDB,
+    return (update(syncOperations)..where((t) => t.id.equals(id))).write(
+      SyncOperationsCompanion(
+        status: const Value('FAILED'),
+        lastError: Value(error),
+        retryCount: Value(currentRetryCount + 1),
+        nextRetryTimestamp: Value(nextRetry),
+      ),
     );
   }
 
-  Future _createDB(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE local_resources (
-        id TEXT PRIMARY KEY,
-        resource_type TEXT NOT NULL,
-        json TEXT NOT NULL,
-        version_id INTEGER NOT NULL DEFAULT 1,
-        sync_status TEXT NOT NULL CHECK(sync_status IN ('SYNCED', 'PENDING', 'CONFLICT')),
-        updated_at TEXT NOT NULL,
-        created_by TEXT NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE sync_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        resource_id TEXT NOT NULL,
-        operation TEXT NOT NULL CHECK(operation IN ('CREATE', 'UPDATE', 'DELETE')),
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY (resource_id) REFERENCES local_resources (id) ON DELETE CASCADE
-      )
-    ''');
-  }
-  
-  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    // Handle migrations here
+  Future<void> markOperationCompleted(String opId, String resourceId) async {
+    await transaction(() async {
+      await (update(syncOperations)..where((t) => t.id.equals(opId))).write(
+        const SyncOperationsCompanion(status: Value('COMPLETED')),
+      );
+      await (update(localResources)..where((t) => t.id.equals(resourceId))).write(
+        const LocalResourcesCompanion(syncStatus: Value('SYNCED')),
+      );
+    });
   }
 
-  Future<void> close() async {
-    final db = await instance.database;
-    db.close();
+  Future<void> markOperationConflict(String opId, String resourceId) async {
+    await transaction(() async {
+      await (update(syncOperations)..where((t) => t.id.equals(opId))).write(
+        const SyncOperationsCompanion(status: Value('FAILED'), lastError: Value('CONFLICT')),
+      );
+      await (update(localResources)..where((t) => t.id.equals(resourceId))).write(
+        const LocalResourcesCompanion(syncStatus: Value('CONFLICT')),
+      );
+    });
   }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'setu_local_drift.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
 }

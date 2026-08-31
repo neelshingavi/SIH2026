@@ -1,106 +1,68 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { lastValueFrom } from 'rxjs';
+import { Injectable, Logger } from '@nestjs/common';
+import { FhirService } from '../fhir/fhir.service.js';
+import { AuditService } from '../audit/audit.service.js';
 
 @Injectable()
 export class PatientService {
   private readonly logger = new Logger(PatientService.name);
-  private readonly hapiUrl = process.env.HAPI_FHIR_URL || 'http://localhost:8080/fhir';
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly fhirService: FhirService,
+    private readonly auditService: AuditService,
+  ) {}
 
-  async searchPatients(name?: string, phone?: string) {
-    this.logger.log(`Searching patients: name=${name}, phone=${phone}`);
-    let url = `${this.hapiUrl}/Patient?`;
-    if (name) url += `name=${name}&`;
-    if (phone) url += `telecom=${phone}&`;
+  async checkDuplicate(patientDto: any, user: any, requestId: string) {
+    this.logger.log(`[${requestId}] Checking for duplicate patient: ${patientDto.name}`);
+    
+    // In a real FHIR query, we would use search parameters. Here we simulate the logic.
+    // Assuming FhirService has a search method or we just do a direct GET.
+    // For this prototype, we'll hit the /Patient endpoint with search query parameters.
+    let searchUrl = `Patient?`;
+    if (patientDto.name) searchUrl += `name=${encodeURIComponent(patientDto.name)}&`;
+    if (patientDto.phone) searchUrl += `telecom=${encodeURIComponent(patientDto.phone)}&`;
+    if (patientDto.birthDate) searchUrl += `birthdate=${patientDto.birthDate}&`;
 
     try {
-      const response = await lastValueFrom(this.httpService.get(url));
-      return response.data; // Returns a FHIR Bundle of Patients
-    } catch (error) {
-      this.logger.error('Error searching patients from HAPI FHIR', error);
-      // Return mocked response if HAPI FHIR is not accessible during demo/testing
-      return this._mockSearchResponse();
+      const existingPatients = await this.fhirService.getResource('Patient', `?name=${patientDto.name}`);
+      // Typically returns a Bundle
+      const entryCount = existingPatients?.total || (existingPatients?.entry?.length || 0);
+
+      await this.auditService.logEvent({
+        userId: user.userId,
+        role: user.role,
+        facilityId: user.facilityId,
+        action: 'PATIENT_DUPLICATE_CHECK',
+        requestId: requestId,
+        result: entryCount > 0 ? 'DUPLICATE_FOUND' : 'NO_DUPLICATE',
+      });
+
+      if (entryCount > 0) {
+        return {
+          status: 'POSSIBLE_DUPLICATE',
+          matches: existingPatients.entry.map((e: any) => e.resource),
+        };
+      }
+      return { status: 'NO_DUPLICATE' };
+    } catch (e) {
+      this.logger.error(`Error checking duplicates`, e.message);
+      return { status: 'NO_DUPLICATE' }; // Fail open for the prototype if FHIR is down
     }
   }
 
-  async getPatientHistory(patientId: string) {
-    this.logger.log(`Fetching longitudinal history for patient ${patientId}`);
+  async getPatientHistory(patientId: string, user: any, requestId: string) {
+    this.logger.log(`[${requestId}] Fetching longitudinal history for patient ${patientId}`);
     
-    // In FHIR, a patient's complete clinical history can be fetched via the $everything operation
-    // or by querying individual resources.
-    const url = `${this.hapiUrl}/Patient/${patientId}/\$everything`;
-    
-    try {
-      const response = await lastValueFrom(this.httpService.get(url));
-      return response.data; // Returns a FHIR Bundle containing Patient, Encounters, Observations, etc.
-    } catch (error) {
-      this.logger.error(`Error fetching history for patient ${patientId}`, error);
-      // Return mocked response if HAPI FHIR is not accessible
-      return this._mockHistoryResponse(patientId);
-    }
-  }
+    await this.auditService.logEvent({
+      userId: user.userId,
+      role: user.role,
+      facilityId: user.facilityId,
+      action: 'PATIENT_VIEWED',
+      resourceType: 'Patient',
+      resourceId: patientId,
+      requestId: requestId,
+      result: 'SUCCESS',
+    });
 
-  private _mockSearchResponse() {
-    return {
-      resourceType: "Bundle",
-      type: "searchset",
-      total: 1,
-      entry: [
-        {
-          resource: {
-            resourceType: "Patient",
-            id: "p1",
-            name: [{ text: "Sunita Sharma" }],
-            telecom: [{ system: "phone", value: "+91 9876543210" }]
-          }
-        }
-      ]
-    };
-  }
-
-  private _mockHistoryResponse(patientId: string) {
-    return {
-      resourceType: "Bundle",
-      type: "searchset",
-      entry: [
-        {
-          resource: {
-            resourceType: "Patient",
-            id: patientId,
-            name: [{ text: "Sunita Sharma" }],
-            gender: "female",
-            birthDate: "1994-05-12"
-          }
-        },
-        {
-          resource: {
-            resourceType: "Condition",
-            id: "cond-1",
-            subject: { reference: `Patient/${patientId}` },
-            code: { text: "Gestational Hypertension" }
-          }
-        },
-        {
-          resource: {
-            resourceType: "Observation",
-            id: "obs-1",
-            subject: { reference: `Patient/${patientId}` },
-            code: { text: "bp.systolic" },
-            valueQuantity: { value: 150, unit: "mmHg" }
-          }
-        },
-        {
-          resource: {
-            resourceType: "Observation",
-            id: "obs-2",
-            subject: { reference: `Patient/${patientId}` },
-            code: { text: "hemoglobin" },
-            valueQuantity: { value: 8.2, unit: "g/dL" }
-          }
-        }
-      ]
-    };
+    return this.fhirService.getPatientEverything(patientId);
   }
 }

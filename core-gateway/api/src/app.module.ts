@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -6,7 +6,6 @@ import { SyncModule } from './sync/sync.module.js';
 import { TriageModule } from './triage/triage.module.js';
 import { TeleconsultModule } from './teleconsult/teleconsult.module.js';
 import { StockModule } from './stock/stock.module.js';
-import { AbdmMockModule } from './abdm-mock/abdm-mock.module.js';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module.js';
 import { PatientModule } from './patient/patient.module.js';
 import { QueueModule } from './queue/queue.module.js';
@@ -14,10 +13,18 @@ import { ReferralModule } from './referral/referral.module.js';
 
 import { StockItem } from './stock/entities/stock.entity.js';
 import { StockMovement } from './stock/entities/stock-movement.entity.js';
-import { QueueEntry } from './queue/entities/queue.entity.js';
-import { Referral } from './referral/entities/referral.entity.js';
-import { Teleconsult } from './teleconsult/entities/teleconsult.entity.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
+import { DiagnosticOrder } from './diagnostics/entities/diagnostic.entity.js';
+import { FhirResource } from './sync/entities/fhir-resource.entity.js';
+import { SyncIdempotency } from './sync/entities/sync-idempotency.entity.js';
+
+import { UsersModule } from './users/users.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { User } from './users/entities/user.entity.js';
+import { AuditEvent } from './audit/entities/audit-event.entity.js';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware.js';
+import { FhirModule } from './fhir/fhir.module.js';
 
 @Module({
   imports: [
@@ -28,12 +35,20 @@ import { AnalyticsModule } from './analytics/analytics.module.js';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'hapi',
-      entities: [StockItem, StockMovement, QueueEntry, Referral, Teleconsult],
+      entities: [StockItem, StockMovement, DiagnosticOrder, FhirResource, SyncIdempotency, User, AuditEvent],
       synchronize: true, // Use only in development
     }),
-    SyncModule, TriageModule, TeleconsultModule, StockModule, AbdmMockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule
+    SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
+    UsersModule, AuthModule, AuditModule, FhirModule
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(CorrelationIdMiddleware)
+      .forRoutes('*');
+  }
+}
+

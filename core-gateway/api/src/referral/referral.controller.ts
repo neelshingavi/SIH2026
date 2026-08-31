@@ -1,41 +1,56 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { ReferralService } from './referral.service.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
 @Controller('referral')
+@UseGuards(JwtAuthGuard)
 export class ReferralController {
   constructor(private readonly referralService: ReferralService) {}
 
-  /** GET /referral?facilityId=PHC-001 */
   @Get()
-  getAll(@Query('facilityId') facilityId?: string) {
-    if (facilityId) return this.referralService.getForFacility(facilityId);
-    return this.referralService.getAll();
+  async getReferrals(
+    @Query('direction') direction: 'incoming' | 'outgoing',
+    @Query('status') status: string,
+    @Query('priority') priority: string,
+    @Query('patientId') patientId: string,
+    @Req() req: any
+  ) {
+    const isIncoming = direction === 'incoming';
+    const filters = { status, priority, patientId };
+    const tasks = await this.referralService.searchReferrals(req.user.facilityId, req.user.role, isIncoming, filters);
+    
+    // SLA Engine: Dynamically attach SLA status
+    return tasks.map(task => {
+      let slaStatus = 'ON_TRACK';
+      if (task.authoredOn) {
+        const hoursSince = (new Date().getTime() - new Date(task.authoredOn).getTime()) / (1000 * 60 * 60);
+        // If it's a stat/emergency priority, SLA is much tighter (1 hour limit)
+        const limit = task.priority === 'stat' ? 1 : task.priority === 'urgent' ? 24 : 72;
+        if (hoursSince > limit) slaStatus = 'BREACHED';
+        else if (hoursSince > limit * 0.75) slaStatus = 'WARNING';
+      }
+      return { ...task, slaStatus };
+    });
   }
 
-  /** POST /referral */
-  @Post()
-  create(@Body() body: {
-    patientName: string;
-    age?: string;
-    gender?: string;
-    fromFacilityId: string;
-    toFacilityId: string;
-    reason: string;
-    notes?: string;
-    priority?: string;
-  }) {
-    return this.referralService.create(body);
+  @Get('destinations')
+  getDestinations(@Query('service') serviceType: string) {
+    return this.referralService.getDestinations(serviceType);
   }
 
-  /** PATCH /referral/:id/advance */
-  @Patch(':id/advance')
-  advance(@Param('id') id: string) {
-    return this.referralService.advance(id);
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id') id: string, 
+    @Body('status') status: string,
+    @Req() req: any
+  ) {
+    return this.referralService.updateStatus(id, status, req.user, req.correlationId);
   }
 
-  /** POST /referral/seed?facilityId=PHC-001 */
-  @Post('seed')
-  seed(@Query('facilityId') facilityId: string) {
-    return this.referralService.seed(facilityId);
+  @Get(':id/packet')
+  getReferralPacket(@Param('id') id: string) {
+    return this.referralService.getReferralPacket(id);
   }
 }
+
+

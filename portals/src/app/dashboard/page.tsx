@@ -103,11 +103,12 @@ export default function MODashboard() {
   const loadOrders = async () => {
     try {
       const res = await fetch(`${API}/diagnostics/orders`);
-      setDiagOrders(await res.json());
+      const data = await res.json();
+      setDiagOrders(Array.isArray(data) ? data : []);
       
       const stockRes = await fetch(`${API}/stock?facilityId=${FACILITY}`);
       const stock = await stockRes.json();
-      if(stock.length > 0) {
+      if(Array.isArray(stock) && stock.length > 0) {
         setLowestStock(stock[0]);
       }
     } catch(e) {}
