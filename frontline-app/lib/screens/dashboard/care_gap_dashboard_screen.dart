@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:frontline_app/db/database.dart';
 import 'package:frontline_app/services/care_gap_service.dart';
 import 'package:frontline_app/services/sync_coordinator.dart';
+import 'package:frontline_app/services/auth_service.dart';
 
 class CareGapDashboardScreen extends StatefulWidget {
   final AppDatabase db;
@@ -25,13 +26,20 @@ class _CareGapDashboardScreenState extends State<CareGapDashboardScreen> {
   String _error = '';
   late final CareGapLocalService _service;
   
-  final String _facilityId = 'PHC-001'; // Mocked for now
+  String _facilityId = '';
 
   @override
   void initState() {
     super.initState();
     _service = CareGapLocalService(widget.db);
-    _fetchCareGaps();
+    _initializeFacilityAndFetchGaps();
+  }
+
+  Future<void> _initializeFacilityAndFetchGaps() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final facilityId = await authService.getFacilityId();
+    _facilityId = facilityId ?? 'UNKNOWN';
+    await _fetchCareGaps();
   }
 
   Future<void> _fetchCareGaps() async {

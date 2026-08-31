@@ -14,24 +14,32 @@ export interface DiagnosticCapability {
 export class DiagnosticsService {
   private readonly logger = new Logger(DiagnosticsService.name);
 
-  // Mock Capability Registry for demo purposes, but the logic is FHIR-based
-  private readonly facilityCapabilities: Record<string, DiagnosticCapability[]> = {
-    'PHC-001': [
-      { code: 'cbc', name: 'Complete Blood Count', availableToday: true, queueLength: 4 },
-      { code: 'sugar', name: 'Blood Sugar', availableToday: true, queueLength: 2 }
-    ],
-    'RH-001': [
-      { code: 'cbc', name: 'Complete Blood Count', availableToday: true, queueLength: 12 },
-      { code: 'sugar', name: 'Blood Sugar', availableToday: true, queueLength: 5 },
-      { code: 'ultrasound', name: 'Ultrasound', availableToday: false, nextSlotDate: '2026-09-03', queueLength: 0 },
-      { code: 'xray', name: 'X-Ray', availableToday: true, queueLength: 8 }
-    ]
-  };
-
   constructor(private readonly fhirService: FhirService) {}
 
   async getCapabilities(facilityId: string): Promise<DiagnosticCapability[]> {
-    return this.facilityCapabilities[facilityId] || [];
+    try {
+      // Real FHIR: Query HealthcareService bound to this Organization
+      const bundle = await this.fhirService.searchResources('HealthcareService', { organization: `Organization/\${facilityId}` });
+      if (!bundle || bundle.length === 0) {
+        return [];
+      }
+      
+      const capabilities: DiagnosticCapability[] = [];
+      for (const service of bundle) {
+        if (service.category?.some((c: any) => c.coding?.some((cod: any) => cod.code === 'laboratory' || cod.code === 'imaging'))) {
+          capabilities.push({
+            code: service.type?.[0]?.coding?.[0]?.code || 'unknown',
+            name: service.type?.[0]?.coding?.[0]?.display || service.name || 'Unknown Service',
+            availableToday: service.availabilityExceptions ? false : true,
+            queueLength: 0 // Would require queue inference from Tasks
+          });
+        }
+      }
+      return capabilities;
+    } catch (e: any) {
+      this.logger.error(`Failed to get capabilities for \${facilityId}: \${e.message}`);
+      return [];
+    }
   }
 
   async getOrders(patientId?: string) {

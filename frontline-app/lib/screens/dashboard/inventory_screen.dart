@@ -15,8 +15,6 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   List<dynamic> inventory = [];
   bool isLoading = true;
-  String patientId = 'P123'; // Mock patient for demo
-  String patientName = 'Jane Doe';
 
   @override
   void initState() {

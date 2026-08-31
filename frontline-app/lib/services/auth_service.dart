@@ -19,8 +19,12 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final token = data['access_token'];
+        final facilityId = data['facilityId'];
         if (token != null) {
           await _storage.write(key: 'jwt_token', value: token);
+          if (facilityId != null) {
+            await _storage.write(key: 'facility_id', value: facilityId);
+          }
           return true;
         }
       }
@@ -33,10 +37,15 @@ class AuthService {
 
   Future<void> logout() async {
     await _storage.delete(key: 'jwt_token');
+    await _storage.delete(key: 'facility_id');
   }
 
   Future<String?> getToken() async {
     return await _storage.read(key: 'jwt_token');
+  }
+
+  Future<String?> getFacilityId() async {
+    return await _storage.read(key: 'facility_id');
   }
 
   Future<bool> isLoggedIn() async {
