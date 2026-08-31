@@ -16,6 +16,9 @@ import 'services/sync_coordinator.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'screens/dashboard/care_gap_dashboard_screen.dart';
+import 'services/offline_inventory_service.dart';
+import 'screens/dashboard/inventory_screen.dart';
+import 'screens/dashboard/diagnostic_request_screen.dart';
 
 void main() {
   runApp(const SetuApp());
@@ -401,6 +404,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: const Icon(Icons.assignment_late),
               label: const Text("Care Gap Dashboard"),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade100),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                final inventoryService = OfflineInventoryService(_db);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => InventoryScreen(
+                  inventoryService: inventoryService,
+                  facilityId: _facilityId,
+                )));
+              },
+              icon: const Icon(Icons.local_pharmacy),
+              label: const Text("Pharmacy / Stock"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade100),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                final inventoryService = OfflineInventoryService(_db);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => DiagnosticRequestScreen(
+                  inventoryService: inventoryService,
+                  patientId: const Uuid().v4(),
+                  patientName: 'Jane Doe',
+                )));
+              },
+              icon: const Icon(Icons.science),
+              label: const Text("Request Diagnostics"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade100),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(

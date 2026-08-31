@@ -242,7 +242,35 @@ export class CarePathwayService {
             const issuedMs = new Date(report.issued).getTime();
             const reportAgeHours = (Date.now() - issuedMs) / 3600000;
             
-            if (reportAgeHours > 2) {
+            // Phase 14: Abnormal Result Escalation
+            const isAbnormal = report.contained?.some((obs: any) => 
+               obs.resourceType === 'Observation' && 
+               obs.interpretation?.some((i: any) => i.coding?.some((c: any) => c.code === 'H' || c.code === 'A' || c.code === 'LL' || c.code === 'HH'))
+            ) || false;
+            
+            if (isAbnormal) {
+               currentState = 'ESCALATION_REQUIRED';
+               gaps.push({
+                 gapId: crypto.randomUUID(),
+                 patientReference: `Patient/\${patientId}`,
+                 pathway: 'DIAGNOSTICS',
+                 step: 'ESCALATION_REQUIRED',
+                 severity: 'CRITICAL',
+                 priority: 'EMERGENCY',
+                 reason: `Abnormal diagnostic result reported for \${sr.code?.coding?.[0]?.display}. Clinical review recommended immediately.`,
+                 expectedAction: 'Medical Officer must review the abnormal result and create referral or follow-up.',
+                 responsibleRole: 'Medical Officer',
+                 responsibleFacility: sr.requester?.reference?.replace('Organization/', '') || facilityId,
+                 dueAt: new Date(issuedMs + 3600000).toISOString(), // 1 hour SLA
+                 createdAt: new Date().toISOString(),
+                 evidence: [
+                   `✓ DiagnosticReport/\${report.id} exists (Final)`,
+                   `✓ Abnormal finding (H/A/LL/HH) detected in contained Observations`,
+                   `✗ No review Task completed`
+                 ],
+                 status: 'OPEN'
+               });
+            } else if (reportAgeHours > 2) {
               currentState = 'CLINICIAN_REVIEW_PENDING';
               gaps.push({
                 gapId: crypto.randomUUID(),
