@@ -14,5 +14,33 @@
   "createReferral": "Create Referral",
   "@createReferral": {
     "description": "Button text to refer patient"
+  },
+  "careGapDashboard": "Care Gap Dashboard",
+  "@careGapDashboard": {
+    "description": "Title for the Care Gap Dashboard screen"
+  },
+  "myCareGaps": "My Care Gaps",
+  "@myCareGaps": {
+    "description": "App bar title for Care Gaps"
+  },
+  "emergency": "Emergency",
+  "@emergency": {
+    "description": "Emergency priority label"
+  },
+  "highRisk": "High Risk",
+  "@highRisk": {
+    "description": "High Risk priority label"
+  },
+  "dueSoon": "Due Soon",
+  "@dueSoon": {
+    "description": "Routine/Due soon priority label"
+  },
+  "resolve": "RESOLVE",
+  "@resolve": {
+    "description": "Button to resolve a care gap"
+  },
+  "patientTimeline": "Patient Timeline",
+  "@patientTimeline": {
+    "description": "Title for the Patient Timeline screen"
   }
 }

@@ -1,11 +1,19 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:frontline_app/auth/auth_service.dart';
+import 'package:frontline_app/db/database.dart';
+import 'package:frontline_app/services/care_gap_service.dart';
+import 'package:frontline_app/services/sync_coordinator.dart';
 
 class CareGapDashboardScreen extends StatefulWidget {
-  const CareGapDashboardScreen({Key? key}) : super(key: key);
+  final AppDatabase db;
+  final SyncCoordinator syncCoordinator;
+
+  const CareGapDashboardScreen({
+    Key? key,
+    required this.db,
+    required this.syncCoordinator,
+  }) : super(key: key);
 
   @override
   _CareGapDashboardScreenState createState() => _CareGapDashboardScreenState();
@@ -13,32 +21,26 @@ class CareGapDashboardScreen extends StatefulWidget {
 
 class _CareGapDashboardScreenState extends State<CareGapDashboardScreen> {
   bool _loading = true;
-  List<dynamic> _gaps = [];
+  List<CareGap> _gaps = [];
   String _error = '';
+  late final CareGapLocalService _service;
+  
+  final String _facilityId = 'PHC-001'; // Mocked for now
 
   @override
   void initState() {
     super.initState();
+    _service = CareGapLocalService(widget.db);
     _fetchCareGaps();
   }
 
   Future<void> _fetchCareGaps() async {
     setState(() { _loading = true; _error = ''; });
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final token = await authService.getToken();
-      
-      final url = Uri.parse('http://localhost:3000/care-gaps/dashboard');
-      final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _gaps = data['gaps'] ?? [];
-        });
-      } else {
-        throw Exception('Failed to load care gaps');
-      }
+      final gaps = await _service.getLocalDashboard(_facilityId);
+      setState(() {
+        _gaps = gaps;
+      });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -63,28 +65,55 @@ class _CareGapDashboardScreenState extends State<CareGapDashboardScreen> {
     }
   }
 
-  Future<void> _resolveGap(Map<String, dynamic> gap) async {
-    if (gap['type'] == 'OVERDUE_FOLLOWUP') {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final token = await authService.getToken();
-      final url = Uri.parse('http://localhost:3000/care-gaps/followup/\${gap['resourceId']}');
-      
-      await http.patch(
-        url, 
-        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
-        body: jsonEncode({'status': 'COMPLETED', 'notes': 'Resolved via Care Gap Dashboard'}),
-      );
-      _fetchCareGaps();
+  Future<void> _resolveGap(CareGap gap) async {
+    if (gap.type == 'OVERDUE_FOLLOWUP') {
+      try {
+        final record = await (widget.db.select(widget.db.localResources)
+            ..where((t) => t.id.equals(gap.resourceId))).getSingleOrNull();
+
+        if (record != null) {
+          final cp = jsonDecode(record.jsonPayload);
+          cp['status'] = 'completed'; // For demo, completing the CarePlan itself, or resolving the Task
+          
+          await widget.db.update(widget.db.localResources).replace(
+            record.copyWith(
+              jsonPayload: jsonEncode(cp),
+              syncStatus: 'PENDING',
+              updatedAt: DateTime.now(),
+            )
+          );
+
+          await widget.db.into(widget.db.syncOperations).insert(
+            SyncOperationsCompanion.insert(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              resourceId: record.id,
+              resourceType: record.resourceType,
+              operation: 'UPDATE',
+              idempotencyKey: DateTime.now().millisecondsSinceEpoch.toString(),
+            )
+          );
+
+          widget.syncCoordinator.syncNow();
+          _fetchCareGaps();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Follow-up resolved locally and queued for sync.')));
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to resolve: \$e')));
+        }
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action needed on patient profile.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action needed on patient profile.')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final emergencyCount = _gaps.where((g) => g['priority'] == 'EMERGENCY').length;
-    final highCount = _gaps.where((g) => g['priority'] == 'HIGH').length;
-    final routineCount = _gaps.where((g) => g['priority'] == 'ROUTINE').length;
+    final emergencyCount = _gaps.where((g) => g.priority == 'EMERGENCY').length;
+    final highCount = _gaps.where((g) => g.priority == 'HIGH').length;
+    final routineCount = _gaps.where((g) => g.priority == 'ROUTINE').length;
 
     return Scaffold(
       appBar: AppBar(
@@ -99,7 +128,6 @@ class _CareGapDashboardScreenState extends State<CareGapDashboardScreen> {
           ? Center(child: Text(_error, style: const TextStyle(color: Colors.red)))
           : Column(
             children: [
-              // Summary Banner
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.blue.shade50,
@@ -121,12 +149,12 @@ class _CareGapDashboardScreenState extends State<CareGapDashboardScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: _getPriorityColor(gap['priority']),
-                          child: Icon(_getTypeIcon(gap['type']), color: Colors.white),
+                          backgroundColor: _getPriorityColor(gap.priority),
+                          child: Icon(_getTypeIcon(gap.type), color: Colors.white),
                         ),
-                        title: Text('\${gap['type'].replaceAll('_', ' ')}'),
-                        subtitle: Text('\${gap['description']}\\nPatient: \${gap['patientId']}'),
-                        trailing: gap['type'] == 'OVERDUE_FOLLOWUP'
+                        title: Text(gap.type.replaceAll('_', ' ')),
+                        subtitle: Text('\${gap.description}\\nPatient: \${gap.patientId}'),
+                        trailing: gap.type == 'OVERDUE_FOLLOWUP'
                             ? TextButton(onPressed: () => _resolveGap(gap), child: const Text('RESOLVE'))
                             : const Icon(Icons.chevron_right),
                         isThreeLine: true,

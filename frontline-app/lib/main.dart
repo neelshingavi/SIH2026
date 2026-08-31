@@ -143,6 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final triageSvc = TriageService();
     final patientId = const Uuid().v4();
     final encounterId = const Uuid().v4();
+    final riskId = const Uuid().v4();
     
     List<Observation> obs = [];
     if (data['bp.systolic'] != null) obs.add(Observation(id: const Uuid().v4(), patientId: patientId, code: 'bp.systolic', value: data['bp.systolic']));
@@ -180,24 +181,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
     
-    // Create Condition resource based on triage
-    final conditionId = const Uuid().v4();
-    await _conditionRepo.createCondition(
-      id: conditionId,
-      patientId: patientId,
-      severity: result.riskBand,
-      note: result.recommendedAction,
-      createdBy: _practitionerId,
-      deviceId: _deviceId,
-      facilityId: _facilityId,
+    // Save RiskAssessment offline
+    final riskAssessment = {
+      'resourceType': 'RiskAssessment',
+      'id': riskId,
+      'status': 'final',
+      'subject': { 'reference': 'Patient/\$patientId' },
+      'encounter': { 'reference': 'Encounter/\$encounterId' },
+      'method': { 'coding': [{ 'system': 'http://setu.in/protocols', 'code': result.protocolVersion }] },
+      'prediction': [{
+        'qualitativeRisk': { 'text': result.riskBand },
+        'rationale': result.flags.join('; ')
+      }],
+      'mitigation': result.recommendedAction,
+      'meta': { 'lastUpdated': DateTime.now().toIso8601String() }
+    };
+
+    await _db.into(_db.localResources).insert(
+      LocalResourcesCompanion.insert(
+        id: riskId,
+        resourceType: 'RiskAssessment',
+        jsonPayload: jsonEncode(riskAssessment),
+        createdBy: const Value('Practitioner/local-user'),
+        deviceId: const Value('device-101'),
+        facilityId: const Value('PHC-001'),
+      )
+    );
+
+    await _db.into(_db.syncOperations).insert(
+      SyncOperationsCompanion.insert(
+        id: const Uuid().v4(),
+        resourceId: riskId,
+        resourceType: 'RiskAssessment',
+        operation: 'CREATE',
+        idempotencyKey: const Uuid().v4(),
+      )
     );
 
     await _refreshStatus();
-    _sync.syncNow(); // Auto trigger sync on write
+    _sync.syncNow(); 
 
     if (mounted) {
+      bool isHighRisk = result.riskBand == 'EMERGENCY' || result.riskBand == 'HIGH_RISK';
+      
       showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (_) => AlertDialog(
           title: Text(
             result.riskBand == 'EMERGENCY' ? '🚨 EMERGENCY' : 
@@ -212,13 +241,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 12),
               const Text('Action:'),
               Text(result.recommendedAction, style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+              if (isHighRisk) ...[
+                const SizedBox(height: 16),
+                const Text('Patient requires escalation to Medical Officer.', style: TextStyle(color: Colors.red)),
+              ]
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))
+            if (!isHighRisk)
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+            if (isHighRisk) ...[
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('DISMISS')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _escalateToMO(patientId, riskId, result.flags.join(', '));
+                },
+                child: const Text('ESCALATE TO MO'),
+              )
+            ]
           ],
         )
       );
+    }
+  }
+
+  Future<void> _escalateToMO(String patientId, String riskId, String rationale) async {
+    final carePlanId = const Uuid().v4();
+    final srId = const Uuid().v4();
+
+    // 1. Create CarePlan locally
+    final carePlan = {
+      'resourceType': 'CarePlan',
+      'id': carePlanId,
+      'status': 'active',
+      'intent': 'plan',
+      'subject': { 'reference': 'Patient/\$patientId' },
+      'created': DateTime.now().toIso8601String(),
+      'description': 'Escalation Plan: \$rationale',
+      'addresses': [{ 'reference': 'RiskAssessment/\$riskId' }]
+    };
+
+    await _db.into(_db.localResources).insert(
+      LocalResourcesCompanion.insert(
+        id: carePlanId,
+        resourceType: 'CarePlan',
+        jsonPayload: jsonEncode(carePlan),
+        createdBy: const Value('Practitioner/local-user'),
+        deviceId: const Value('device-101'),
+        facilityId: const Value('PHC-001'),
+      )
+    );
+
+    await _db.into(_db.syncOperations).insert(
+      SyncOperationsCompanion.insert(
+        id: const Uuid().v4(),
+        resourceId: carePlanId,
+        resourceType: 'CarePlan',
+        operation: 'CREATE',
+        idempotencyKey: const Uuid().v4(),
+      )
+    );
+
+    // 2. Create ServiceRequest locally (Referral)
+    final serviceRequest = {
+      'resourceType': 'ServiceRequest',
+      'id': srId,
+      'status': 'active',
+      'intent': 'order',
+      'priority': 'stat',
+      'subject': { 'reference': 'Patient/\$patientId' },
+      'reasonReference': [{ 'reference': 'RiskAssessment/\$riskId' }],
+    };
+
+    await _db.into(_db.localResources).insert(
+      LocalResourcesCompanion.insert(
+        id: srId,
+        resourceType: 'ServiceRequest',
+        jsonPayload: jsonEncode(serviceRequest),
+        createdBy: const Value('Practitioner/local-user'),
+        deviceId: const Value('device-101'),
+        facilityId: const Value('PHC-001'),
+      )
+    );
+
+    await _db.into(_db.syncOperations).insert(
+      SyncOperationsCompanion.insert(
+        id: const Uuid().v4(),
+        resourceId: srId,
+        resourceType: 'ServiceRequest',
+        operation: 'CREATE',
+        idempotencyKey: const Uuid().v4(),
+      )
+    );
+
+    _sync.syncNow();
+    _refreshStatus();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Escalated: CarePlan and Referral created offline!')));
     }
   }
 
@@ -271,7 +393,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CareGapDashboardScreen()));
+                Navigator.push(context, MaterialPageRoute(builder: (_) => CareGapDashboardScreen(
+                  db: _db,
+                  syncCoordinator: _sync,
+                )));
               },
               icon: const Icon(Icons.assignment_late),
               label: const Text("Care Gap Dashboard"),
