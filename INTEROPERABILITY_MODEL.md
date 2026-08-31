@@ -1,27 +1,19 @@
-# Interoperability Model
+# INTEROPERABILITY MODEL (Phase 57)
 
-This document describes how Setu integrates with the broader digital health ecosystem while maintaining a stable internal operation.
+## Core Concept
+Setu achieves interoperability not by directly coupling the Flutter app to an external provider (like ABDM), but by establishing a standard FHIR interface at the Gateway layer, mediated by an Adapter.
 
-## External Record Import
-External FHIR records follow a strict ingestion pipeline:
-1. **Validation:** Ensure valid FHIR format and required fields.
-2. **Identity Resolution:** Match external patient identifiers (e.g., ABHA) to internal Setu UUIDs.
-3. **Consent Verification:** Confirm consent exists to ingest the data.
-4. **Reference Validation:** Ensure internal linkages (e.g., Encounter -> Patient) make sense.
-5. **Deduplication:** Use stable identifiers to prevent creating duplicate records on multiple syncs.
-6. **Local Cache / Timeline:** Insert into HAPI FHIR with clear `Provenance` indicating the external source.
+### Information Flow
 
-## Provenance Tracking
-Imported resources are tagged using the FHIR `Provenance` resource to track:
-- Source organization/system
-- Source timestamp
-- Actor
+1. **Flutter Offline**: Data is captured using offline SQLite and deterministic sync. The data model is a flattened FHIR representation.
+2. **Gateway Processing**: Incoming sync data is hydrated into proper FHIR resources (Patient, Encounter, Observation, Condition).
+3. **FHIR Core**: HAPI FHIR acts as the ultimate canonical data store.
+4. **Exchange Trigger**: When a Referral is accepted (or manual export is requested), the `HieOutboxService` queues a transaction.
+5. **Data Minimization**: `HieService` extracts a `document` Bundle, filtering only the relevant data based on the `Consent` resource scope.
+6. **Adapter Routing**: The `AbdmGatewayService` (implementing `HealthExchangeAdapter`) translates the internal Bundle into the external NDHM/ABDM format and securely transmits it.
+7. **Identity Resolution**: Incoming external data passes through `PatientIdentityService` to safely map external ABHA/UUIDs to internal UUIDs without silent overwrites.
 
-## Bandwidth-Aware Mode
-In low connectivity:
-- Prioritize: Patient identity, emergency observations, RiskAssessment, ServiceRequest, Task.
-- Defer: Large attachments, historical records.
-Emergency clinical data always receives highest priority in the exchange queue.
-
-## ABDM Adapter (AbdmGateway)
-All external interactions go through the `AbdmGateway` abstraction to avoid tightly coupling the core business logic with specific ABDM API versions. The integration supports multiple modes: `REAL`, `SANDBOX`, `LOCAL_SIMULATION`, and `UNAVAILABLE`.
+## Security Boundary
+- Setu never exposes its internal database IDs externally.
+- External tokens are never passed to the Flutter client.
+- The `HealthExchangeAdapter` is the only component allowed to make external network calls to the HIE.

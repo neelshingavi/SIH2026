@@ -408,6 +408,42 @@ export class CarePathwayService {
       allGaps.push(...evaluation.gaps);
     }
 
+    // Phase 36: Add care gaps from HIE exchange failures
+    // Check AuditEvents for failed exports that have not been retried
+    try {
+      const auditEvents = await this.fhirService.searchResources('AuditEvent', { action: 'E' });
+      for (const event of auditEvents) {
+        if (event.outcome === '8' && event.outcomDesc?.includes('RECORD_EXPORT_FAILED')) {
+          // Failed HIE export — create RECORD_SHARE_FAILED care gap
+          const patientRef = event.entity?.find((e: any) => e.type?.code === '1')?.what?.reference;
+          if (patientRef) {
+            allGaps.push({
+              gapId: crypto.randomUUID(),
+              patientReference: patientRef,
+              pathway: 'HIE_EXCHANGE',
+              step: 'RECORD_SHARE_FAILED',
+              severity: 'MODERATE',
+              priority: 'HIGH',
+              reason: `Health information exchange failed: ${event.outcomeDesc || 'Unknown error'}`,
+              expectedAction: 'Retry record sharing or obtain new consent',
+              responsibleRole: 'MO / ANM',
+              responsibleFacility: facilityId,
+              dueAt: new Date(Date.now() + 86400000).toISOString(),
+              createdAt: new Date().toISOString(),
+              evidence: [
+                `✗ AuditEvent records RECORD_EXPORT_FAILED for ${patientRef}`,
+                `✗ No successful RECORD_EXPORTED found`,
+              ],
+              status: 'OPEN',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal: HIE audit gap detection is best-effort
+      this.logger.warn(`HIE audit gap detection failed: ${e.message}`);
+    }
+
     // Sort by priority (EMERGENCY > HIGH > ROUTINE)
     allGaps.sort((a, b) => {
       const pmap = { 'EMERGENCY': 3, 'HIGH': 2, 'ROUTINE': 1 };

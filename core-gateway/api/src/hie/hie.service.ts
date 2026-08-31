@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestEx
 import { FhirService } from '../fhir/fhir.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ConsentService } from '../consent/consent.service.js';
+import { PatientIdentityService, IdentityMatchResult } from './patient-identity.service.js';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -12,7 +13,10 @@ export class HieService {
     private readonly fhirService: FhirService,
     private readonly auditService: AuditService,
     private readonly consentService: ConsentService,
+    private readonly identityService: PatientIdentityService,
   ) {}
+
+  // ... (exportClinicalSummary remains unchanged, skipping lines for brevity)
 
   async exportClinicalSummary(patientId: string, recipientFacilityId: string, purpose: string, user: any, correlationId: string) {
     this.logger.log(`Exporting clinical summary for patient \${patientId} to \${recipientFacilityId}`);
@@ -20,7 +24,6 @@ export class HieService {
     // 1. Consent Verification
     const hasConsent = await this.consentService.checkActiveConsent(patientId, recipientFacilityId, purpose);
     if (!hasConsent) {
-      // Break-glass fallback could go here if implemented, but we require consent for standard flow
       await this.auditService.logEvent({
         userId: user.userId,
         role: user.role,
@@ -35,7 +38,6 @@ export class HieService {
       throw new ForbiddenException('Active consent not found for this export');
     }
 
-    // 2. Prepare Record (Data Minimization)
     const patient = await this.fhirService.getResource('Patient', patientId);
     if (!patient) throw new NotFoundException('Patient not found');
 
@@ -48,10 +50,8 @@ export class HieService {
     const medicationRequests = await this.fhirService.searchResources('MedicationRequest', { subject: `Patient/\${patientId}` });
     const risks = await this.fhirService.searchResources('RiskAssessment', { subject: `Patient/\${patientId}` });
 
-    // Filter to only active/relevant data based on purpose (simplified)
     const activeConditions = conditions.filter((c: any) => c.clinicalStatus?.coding?.[0]?.code === 'active');
     
-    // Construct FHIR Document Bundle
     const bundleId = crypto.randomUUID();
     const bundle = {
       resourceType: 'Bundle',
@@ -61,7 +61,7 @@ export class HieService {
       entry: [
         { fullUrl: `urn:uuid:\${patientId}`, resource: patient },
         ...activeConditions.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...observations.slice(0, 10).map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })), // Limit
+        ...observations.slice(0, 10).map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
         ...encounters.slice(0, 5).map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
         ...carePlans.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
         ...serviceRequests.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
@@ -71,7 +71,6 @@ export class HieService {
       ]
     };
 
-    // 3. Audit Success
     await this.auditService.logEvent({
       userId: user.userId,
       role: user.role,
@@ -90,25 +89,45 @@ export class HieService {
   async importClinicalSummary(bundle: any, user: any, correlationId: string) {
     this.logger.log(`Importing clinical summary`);
 
-    // 1. Validation
     if (!bundle || bundle.resourceType !== 'Bundle' || !bundle.entry) {
       throw new BadRequestException('Invalid FHIR Bundle');
     }
 
-    // 2. Identity Resolution & Deduplication (Simplified for prototype)
-    // In a real system, we'd check ABHA and map to internal UUIDs, or use If-None-Exist
-    let patientId = null;
+    let localPatientId = null;
     let importedCount = 0;
 
+    // 1. Resolve Patient Identity First (Phase 16)
+    const patientEntry = bundle.entry.find((e: any) => e.resource?.resourceType === 'Patient');
+    if (patientEntry) {
+        const { result, localPatientId: resolvedId } = await this.identityService.resolveIdentity(patientEntry.resource);
+        
+        if (result === IdentityMatchResult.MATCH) {
+            localPatientId = resolvedId;
+            this.logger.log(`Matched external patient to local patient \${localPatientId}`);
+        } else if (result === IdentityMatchResult.POSSIBLE_MATCH || result === IdentityMatchResult.CONFLICT) {
+            this.logger.warn(`Identity conflict or possible match detected. Pushing to manual review queue.`);
+            // In a real system, we'd halt import or quarantine the bundle until human review (Phase 17)
+            throw new BadRequestException('PATIENT_IDENTITY_CONFLICT_REQUIRES_REVIEW');
+        } else {
+            // NO_MATCH, we will create a new patient
+            this.logger.log(`No local match found. Will import as new patient.`);
+        }
+    }
+
+    // 2. Import Resources
     for (const entry of bundle.entry) {
       const resource = entry.resource;
       if (!resource || !resource.resourceType || !resource.id) continue;
       
-      if (resource.resourceType === 'Patient') {
-         patientId = resource.id;
+      // If we matched the patient, we need to rewrite external patient references to our local UUID
+      if (localPatientId && resource.resourceType === 'Patient') {
+          continue; // We already have the patient, don't overwrite demographics automatically
       }
 
-      // Add provenance to track external origin
+      if (localPatientId && resource.subject?.reference?.startsWith('Patient/')) {
+          resource.subject.reference = `Patient/\${localPatientId}`;
+      }
+
       const provenance = {
         resourceType: 'Provenance',
         id: crypto.randomUUID(),
@@ -117,7 +136,6 @@ export class HieService {
         agent: [{ who: { reference: `Organization/\${user.facilityId}` }, type: { coding: [{ code: 'assembler' }] } }]
       };
       
-      // Save locally (simulated HIE ingestion)
       try {
         await this.fhirService.createOrUpdate(resource.resourceType, resource.id, resource, undefined, 'CREATE');
         await this.fhirService.createOrUpdate('Provenance', provenance.id, provenance, undefined, 'CREATE');
@@ -127,7 +145,6 @@ export class HieService {
       }
     }
 
-    // 3. Audit
     await this.auditService.logEvent({
       userId: user.userId,
       role: user.role,
@@ -140,6 +157,6 @@ export class HieService {
       reason: `Imported \${importedCount} resources`
     });
 
-    return { success: true, importedCount, patientId };
+    return { success: true, importedCount, localPatientId };
   }
 }

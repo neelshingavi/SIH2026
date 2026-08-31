@@ -32,6 +32,14 @@ import { HieModule } from './hie/hie.module.js';
 import { AbdmModule } from './abdm/abdm.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RateLimiterMiddleware } from './common/middleware/rate-limiter.middleware.js';
+import { TerminologyService } from './common/terminology/terminology.service.js';
+
+@Global()
+@Module({
+  providers: [TerminologyService],
+  exports: [TerminologyService],
+})
+export class TerminologyModule {}
 
 @Module({
   imports: [
@@ -47,7 +55,7 @@ import { RateLimiterMiddleware } from './common/middleware/rate-limiter.middlewa
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
     UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule, CarePathwayModule, AlertModule,
-    ConsentModule, HieModule, AbdmModule, HealthModule
+    ConsentModule, HieModule, AbdmModule, HealthModule, TerminologyModule
   ],
   controllers: [AppController],
   providers: [AppService],

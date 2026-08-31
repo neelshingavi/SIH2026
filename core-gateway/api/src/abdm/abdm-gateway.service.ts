@@ -1,4 +1,6 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { FhirService } from '../fhir/fhir.service.js';
+import { HealthExchangeAdapter, ExchangeRequest, ExchangeStatus } from '../hie/interfaces/health-exchange-adapter.interface.js';
 
 export enum AbdmMode {
   REAL = 'REAL',
@@ -8,11 +10,11 @@ export enum AbdmMode {
 }
 
 @Injectable()
-export class AbdmGatewayService {
+export class AbdmGatewayService implements HealthExchangeAdapter {
   private readonly logger = new Logger(AbdmGatewayService.name);
   private readonly mode: AbdmMode;
 
-  constructor() {
+  constructor(private readonly fhirService: FhirService) {
     const envMode = process.env.ABDM_MODE?.toUpperCase() || 'LOCAL_SIMULATION';
     if (Object.values(AbdmMode).includes(envMode as AbdmMode)) {
       this.mode = envMode as AbdmMode;
@@ -26,31 +28,34 @@ export class AbdmGatewayService {
     return this.mode;
   }
 
-  async verifyAbha(abhaNumber: string): Promise<any> {
-    this.logger.log(`Verifying ABHA: \${abhaNumber} (Mode: \${this.mode})`);
-    
-    if (this.mode === AbdmMode.UNAVAILABLE) {
-      throw new HttpException('ABDM service is currently unavailable', HttpStatus.SERVICE_UNAVAILABLE);
-    }
+  async linkCareContext(patientId: string, facilityId: string, consentArtifactId: string): Promise<boolean> {
+    this.logger.log(`[ABDM_SIM] Linking care context for \${patientId} to \${facilityId} with consent \${consentArtifactId}`);
+    return true;
+  }
 
-    if (this.mode === AbdmMode.LOCAL_SIMULATION) {
-      // Simulate verification
-      if (!abhaNumber || abhaNumber.length < 5) {
-         return { valid: false, message: 'Invalid format' };
-      }
-      return {
-         valid: true,
-         patientDetails: {
-           abhaNumber,
-           name: 'Simulated Patient',
-           gender: 'M',
-           yearOfBirth: '1980'
-         }
-      };
-    }
+  // Phase 9: HealthExchangeAdapter implementation
+  async createExchangeRequest(request: ExchangeRequest): Promise<string> {
+    this.logger.log(`[ABDM \${this.mode}] Creating exchange request for patient \${request.patientId}, purpose: \${request.purpose}`);
+    return `ex-\${Date.now()}`;
+  }
 
-    // In SANDBOX or REAL, this would make an external HTTP call to ABDM APIs
-    // e.g. POST to https://dev.abdm.gov.in/gateway/v0.5/users/auth/fetch-modes
-    return { valid: false, message: 'Not implemented in this environment' };
+  async submitInformation(exchangeId: string, bundle: any): Promise<boolean> {
+    this.logger.log(`[ABDM \${this.mode}] Submitting FHIR Bundle for exchange \${exchangeId}`);
+    // Simulate async submission logic
+    return true; 
+  }
+
+  async checkStatus(exchangeId: string): Promise<ExchangeStatus> {
+    // In a real integration, we'd poll the HIE or NDHM API.
+    return ExchangeStatus.COMPLETED;
+  }
+
+  async receiveInformation(exchangeId: string): Promise<any> {
+    // Return empty bundle for simulation
+    return { resourceType: 'Bundle', entry: [] };
+  }
+
+  async cancelExchange(exchangeId: string): Promise<void> {
+    this.logger.log(`[ABDM \${this.mode}] Cancelling exchange \${exchangeId}`);
   }
 }

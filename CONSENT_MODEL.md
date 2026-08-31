@@ -1,27 +1,61 @@
-# Consent Model
+# CONSENT MODEL (Phase 57)
 
-The Consent Model governs data sharing within Setu and with external ABDM-compatible systems.
+## Architecture
 
-## Key Properties
-Consent represents:
-- **Who:** The actor requesting/giving consent.
-- **For whom:** The patient whose data is shared.
-- **What data:** Scope of clinical data (e.g., all, specific encounters, specific observations).
-- **For what purpose:** e.g., TREATMENT, REFERRAL, DIAGNOSTIC_REVIEW.
-- **With whom:** The receiving organization/facility.
-- **Duration:** Validity period (`createdAt`, `expiresAt`).
-- **Status:** State of the consent.
+Consent in Setu is represented as a FHIR R4 `Consent` resource with the following explicit fields:
+
+### FHIR Consent Structure
+```json
+{
+  "resourceType": "Consent",
+  "status": "active | inactive",
+  "scope": { "coding": [{ "code": "patient-privacy" }] },
+  "patient": { "reference": "Patient/<id>" },
+  "dateTime": "<ISO timestamp>",
+  "performer": [{ "reference": "Practitioner/<id>" }],
+  "organization": [{ "reference": "Organization/<recipientFacilityId>" }],
+  "provision": {
+    "type": "permit",
+    "period": { "start": "<start>", "end": "<expiry>" },
+    "purpose": [{ "system": "...", "code": "TREAT | REFERRAL | DIAGNOSTICS" }],
+    "data": [{ "meaning": "related", "reference": { "type": "Patient" } }]
+  }
+}
+```
 
 ## Consent States
-1. `REQUESTED`: Consent has been asked but not yet granted.
-2. `ACTIVE`: Consent is valid and ongoing.
-3. `REJECTED`: The user explicitly denied the request.
-4. `REVOKED`: A previously active consent was withdrawn.
-5. `EXPIRED`: The consent's validity period has ended.
 
-## FHIR Representation
-Consent is mapped to the standard FHIR `Consent` resource.
+| State | Meaning |
+|---|---|
+| `active` | Consent granted and valid |
+| `inactive` | Consent revoked by patient |
+| `requested` | (Future) awaiting patient response |
+| `rejected` | Patient declined |
+| `expired` | Period end passed (enforced by `checkActiveConsent`) |
 
-## Offline Considerations
-- **Local Consent Recorded:** Consents can be gathered offline and synced.
-- **Central Consent Verified:** The authoritative state comes from the server. If a conflict occurs (e.g., local = ACTIVE, server = REVOKED), the server's revoked state wins.
+## Purpose Codes
+
+| Code | Meaning |
+|---|---|
+| `TREAT` | Treatment and care |
+| `REFERRAL` | Specialist referral |
+| `DIAGNOSTICS` | Diagnostic review |
+| `MEDICATION` | Medication management |
+| `TELECONSULT` | Teleconsultation |
+| `EMERGENCY` | Emergency access |
+
+## Key Rules
+
+1. **Login ≠ Consent**: JWT authentication does not represent clinical data sharing consent.
+2. **Offline Consent**: Recorded offline with `_tag: LOCAL_CONSENT`. Synced to server when connectivity returns. Gateway re-validates against FHIR on export.
+3. **Revocation**: Sets status to `inactive`. Historical records preserved. Future exchange blocked.
+4. **Expiry**: `provision.period.end` checked on every export. Expired = auto-denied.
+5. **Scope**: `provision.data[]` lists explicit FHIR resource types permitted. Export is filtered accordingly.
+
+## Audit Trail
+
+Every consent action creates an `AuditEvent`:
+- `CONSENT_GRANTED`
+- `CONSENT_REVOKED`
+- `CONSENT_CHECK_FAILED`
+- `RECORD_EXPORT_FAILED` (when consent missing)

@@ -1,30 +1,44 @@
-# ABDM Architecture
+# PRODUCTION INTEROPERABILITY ARCHITECTURE
 
-## Setu & ABDM Conceptual Model
-This document details the mapping between Setu concepts and ABDM (Ayushman Bharat Digital Mission) concepts.
+This architecture demonstrates the flow from the offline frontline app to the external health information exchange ecosystem.
 
-### High-level Flow
 ```text
-Setu Frontline App
-        ↓
-Setu Gateway (ABDM Gateway Adapter)
-        ↓
-FHIR / HAPI (Clinical Data Repository)
-        ↓
-ABDM-compatible exchange layer
+                    SETU
+
+       ┌─────────────────────────┐
+       │      Frontline App      │
+       │ Offline-first Flutter   │
+       └────────────┬────────────┘
+                    │
+                    ▼
+       ┌─────────────────────────┐
+       │      API Gateway        │
+       │ Auth + RBAC + Security  │
+       └────────────┬────────────┘
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+   ┌──────────────┐    ┌───────────────┐
+   │   FHIR Core  │    │ Exchange Layer│
+   │    HAPI FHIR │    │ Consent + HIE │
+   └──────────────┘    └───────┬───────┘
+                               │
+                               ▼
+                       External Ecosystem
+
+              ┌─────────────────────────┐
+              │ Clinical Intelligence   │
+              │ Risk + Care Gaps + SLA  │
+              └─────────────────────────┘
+
+              ┌─────────────────────────┐
+              │ Observability           │
+              │ Audit + Metrics + Alert │
+              └─────────────────────────┘
 ```
 
-### Concept Mapping
-- **Patient identity:** 
-  - Internal: Setu Patient UUID, FHIR Patient.id.
-  - External: ABHA identifier (optional, linked via Identity Service).
-- **Clinical records:**
-  - Standard FHIR resources (Observation, Encounter, DiagnosticReport, etc.) stored in HAPI FHIR.
-- **Consent:**
-  - Internal: FHIR Consent resources managing data sharing logic.
-  - External: ABDM Consent Artefact (EXTERNAL DEPENDENCY).
-- **Health information provider (HIP):** Setu acts as a HIP when sharing records.
-- **Health information user (HIU):** Setu acts as a HIU when requesting records.
-- **Health information exchange (HIE):** Mediated via the `HealthInformationExchangeService` which generates FHIR Bundles.
-- **Health record sharing:** Exchanging FHIR Bundles based on validated Consent.
-- **Audit:** AuditEvent resources tracking all exchanges and consent validations.
+## Boundaries and Guarantees
+1. **Offline Capture**: Data is captured offline and pushed to the Gateway via idempotent syncing.
+2. **Deterministic Risk**: Local processing identifies gaps and escalates safely.
+3. **Consent-Gated Exchange**: HIE operations will not fire unless explicit FHIR Consent exists.
+4. **Adapter Pattern**: Setu communicates externally via the `HealthExchangeAdapter`, ensuring vendor neutrality (ABDM sandbox vs Production).

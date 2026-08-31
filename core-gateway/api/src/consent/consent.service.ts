@@ -40,7 +40,13 @@ export class ConsentService {
         purpose: [{
           system: 'http://terminology.hl7.org/CodeSystem/v3-ActReason',
           code: payload.purpose || 'TREAT'
-        }]
+        }],
+        // Phase 6/10: Explicit scope — which resource types are permitted for exchange
+        // Defaults to referral-appropriate minimum if not specified
+        data: (payload.resourceScope || ['Patient', 'Observation', 'Condition', 'RiskAssessment', 'CarePlan', 'ServiceRequest', 'DiagnosticReport', 'MedicationRequest']).map((rt: string) => ({
+          meaning: 'related',
+          reference: { type: rt }
+        }))
       }
     };
 

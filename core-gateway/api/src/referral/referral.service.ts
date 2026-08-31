@@ -147,6 +147,31 @@ export class ReferralService {
       result: 'SUCCESS',
     });
 
+    // Phase 21: Trigger HIE Exchange when Referral is Accepted
+    if (newStatus === 'accepted') {
+      try {
+        const patientRef = task.for?.reference;
+        if (patientRef && patientRef.startsWith('Patient/')) {
+          const patientId = patientRef.replace('Patient/', '');
+          this.logger.log(`Referral \${taskId} accepted. Queuing HIE Exchange for Patient \${patientId}`);
+          
+          const priority = task.priority === 'stat' ? 'EMERGENCY' : 'ROUTINE';
+          
+          this.queueService.enqueue({
+             type: 'HIE_EXPORT',
+             patientId,
+             recipientFacilityId: user.facilityId,
+             purpose: 'REFERRAL',
+             priority,
+             user,
+             correlationId
+          });
+        }
+      } catch (e) {
+        this.logger.warn(`Failed to trigger HIE export on referral acceptance: \${e.message}`);
+      }
+    }
+
     return task;
   }
 
