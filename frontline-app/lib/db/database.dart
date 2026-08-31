@@ -194,6 +194,16 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> markOperationFailed(
       String id, String error, int currentRetryCount) {
+    if (currentRetryCount >= 10) {
+      return (update(syncOperations)..where((t) => t.id.equals(id))).write(
+        SyncOperationsCompanion(
+          status: const Value('FAILED_PERMANENTLY'),
+          lastError: Value(error),
+          retryCount: Value(currentRetryCount + 1),
+        ),
+      );
+    }
+
     // Exponential backoff capped at 1 hour: 2^retryCount * 5 seconds
     final delaySeconds = (1 << currentRetryCount) * 5;
     final cappedDelay = delaySeconds > 3600 ? 3600 : delaySeconds;

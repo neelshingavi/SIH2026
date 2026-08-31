@@ -123,6 +123,14 @@ class _PatientTimelineScreenState extends State<PatientTimelineScreen> {
     } else if (type == 'Condition') {
       title = 'Condition Recorded';
       subtitle = 'Severity: \${resource['severity']}';
+    } else if (type == 'Provenance') {
+      title = 'Record Imported';
+      subtitle = 'Source: \${resource['agent']?[0]?['who']?['reference'] ?? 'External ABDM Gateway'}';
+    }
+
+    String sourceTag = 'LOCAL RECORD';
+    if (type == 'Provenance') {
+      sourceTag = 'IMPORTED RECORD';
     }
 
     return IntrinsicHeight(
@@ -161,7 +169,20 @@ class _PatientTimelineScreenState extends State<PatientTimelineScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: type == 'Provenance' ? Colors.purple.shade50 : Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4)
+                        ),
+                        child: Text(sourceTag, style: TextStyle(fontSize: 10, color: type == 'Provenance' ? Colors.purple : Colors.blue, fontWeight: FontWeight.bold)),
+                      )
+                    ]
+                  ),
                   if (subtitle.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),

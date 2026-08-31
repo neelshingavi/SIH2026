@@ -9,6 +9,10 @@ export type PathwayState =
   | 'CLINICIAN_REVIEW_PENDING'
   | 'ESCALATION_REQUIRED'
   | 'REFERRAL_PENDING'
+  | 'CONSENT_PENDING'
+  | 'CONSENT_OBTAINED'
+  | 'RECORD_SHARE_FAILED'
+  | 'RECORD_SHARED'
   | 'REFERRAL_ACCEPTED'
   | 'CONSULTATION_PENDING'
   | 'CONSULTATION_COMPLETED'
@@ -96,6 +100,43 @@ export class CarePathwayService {
           } else if (referralTask.status === 'completed') {
             currentState = 'CONSULTATION_COMPLETED';
           } else {
+            // Check Consent status before HIE
+            const consents = await this.fhirService.searchResources('Consent', { patient: `Patient/\${patientId}` });
+            const hasConsent = consents.some((c: any) => c.status === 'active');
+            
+            if (hasConsent) {
+              currentState = 'CONSENT_OBTAINED';
+              
+              // Verify if HIE export has succeeded
+              const auditEvents = await this.fhirService.searchResources('AuditEvent', { entity: `Patient/\${patientId}` });
+              const isShared = auditEvents.some((a: any) => a.action === 'E' && a.outcome === '0'); // Simplified check
+              
+              if (isShared) {
+                 currentState = 'RECORD_SHARED';
+              }
+            } else {
+              currentState = 'CONSENT_PENDING';
+              gaps.push({
+                  gapId: crypto.randomUUID(),
+                  patientReference: `Patient/\${patientId}`,
+                  pathway: 'HIGH_RISK_ANC',
+                  step: 'CONSENT_PENDING',
+                  severity: 'MODERATE',
+                  priority: 'HIGH',
+                  reason: `Referral exists but patient consent for health information exchange is missing.`,
+                  expectedAction: 'ASHA must obtain consent for sharing records',
+                  responsibleRole: 'ASHA',
+                  responsibleFacility: facilityId,
+                  dueAt: new Date(Date.now() + 86400000).toISOString(),
+                  createdAt: new Date().toISOString(),
+                  evidence: [
+                    `✓ ServiceRequest/\${relatedReferral.id} exists`,
+                    `✗ No active Consent resource found`
+                  ],
+                  status: 'OPEN'
+                });
+            }
+
             // Check SLA for STAT referral
             if (relatedReferral.priority === 'stat') {
               const authoredMs = new Date(referralTask.authoredOn).getTime();

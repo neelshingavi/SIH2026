@@ -27,6 +27,11 @@ import { FhirModule } from './fhir/fhir.module.js';
 import { CareGapModule } from './care-gap/care-gap.module.js';
 import { CarePathwayModule } from './care-pathway/care-pathway.module.js';
 import { AlertModule } from './alert/alert.module.js';
+import { ConsentModule } from './consent/consent.module.js';
+import { HieModule } from './hie/hie.module.js';
+import { AbdmModule } from './abdm/abdm.module.js';
+import { HealthModule } from './health/health.module.js';
+import { RateLimiterMiddleware } from './common/middleware/rate-limiter.middleware.js';
 
 @Module({
   imports: [
@@ -41,7 +46,8 @@ import { AlertModule } from './alert/alert.module.js';
       synchronize: true, // Use only in development
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
-    UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule, CarePathwayModule, AlertModule
+    UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule, CarePathwayModule, AlertModule,
+    ConsentModule, HieModule, AbdmModule, HealthModule
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -51,5 +57,14 @@ export class AppModule implements NestModule {
     consumer
       .apply(CorrelationIdMiddleware)
       .forRoutes('*');
+    consumer
+      .apply(RateLimiterMiddleware)
+      .forRoutes(
+        { path: 'sync/*', method: RequestMethod.ALL },
+        { path: 'auth/*', method: RequestMethod.ALL },
+        { path: 'patient/*', method: RequestMethod.ALL },
+        { path: 'referral/*', method: RequestMethod.ALL },
+        { path: 'exchange/*', method: RequestMethod.ALL }
+      );
   }
 }
