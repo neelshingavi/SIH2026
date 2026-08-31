@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../db/database.dart';
 
+import '../config/env.dart';
+
 class SyncService {
-  final String gatewayUrl = 'http://10.0.2.2:3000'; // Android emulator localhost alias
+  final String gatewayUrl = AppConfig.gatewayBaseUrl;
 
   Future<void> syncPendingRecords() async {
     final db = await DatabaseHelper.instance.database;

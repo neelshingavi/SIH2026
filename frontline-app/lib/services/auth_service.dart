@@ -1,15 +1,17 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import '../config/env.dart';
 
 class AuthService {
   final _storage = const FlutterSecureStorage();
-  final String _baseUrl = 'http://localhost:3001/auth'; // Replace with env in prod
+  // Use AppConfig instead of hardcoded string
+  final String _baseUrl = AppConfig.authUrl;
 
   Future<bool> login(String username, String password) async {
     try {
       final response = await http.post(
-        Uri.parse('\$_baseUrl/login'),
+        Uri.parse('$_baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username, 'password': password}),
       );

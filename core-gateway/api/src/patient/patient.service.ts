@@ -43,7 +43,7 @@ export class PatientService {
         };
       }
       return { status: 'NO_DUPLICATE' };
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error(`Error checking duplicates`, e.message);
       return { status: 'NO_DUPLICATE' }; // Fail open for the prototype if FHIR is down
     }

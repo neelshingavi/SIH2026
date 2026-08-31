@@ -30,20 +30,19 @@ class _TeleconsultRoomScreenState extends State<TeleconsultRoomScreen> {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final token = await authService.getToken();
+      final url = Uri.parse('${AppConfig.teleconsultWsUrl}/token');
       
-      // Get JWT from NestJS secure backend
-      final url = Uri.parse('http://localhost:3000/teleconsult/token');
-      final response = await http.post(
+      final res = await http.post(
         url,
         headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
         body: jsonEncode({'taskId': widget.taskId}),
       );
 
-      if (response.statusCode != 201 && response.statusCode != 200) {
-        throw Exception('Failed to get room token. Code: \${response.statusCode}');
+      if (res.statusCode != 201 && res.statusCode != 200) {
+        throw Exception('Failed to get room token. Code: ${res.statusCode}');
       }
 
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(res.body);
       final roomUrl = data['url'];
       final roomToken = data['token'];
 
@@ -104,7 +103,7 @@ class _TeleconsultRoomScreenState extends State<TeleconsultRoomScreen> {
               try {
                 final authService = Provider.of<AuthService>(context, listen: false);
                 final token = await authService.getToken();
-                final url = Uri.parse('http://localhost:3000/teleconsult/\${widget.taskId}/complete');
+                final url = Uri.parse('\${AppConfig.teleconsultWsUrl}/\${widget.taskId}/complete');
                 
                 await http.post(
                   url,

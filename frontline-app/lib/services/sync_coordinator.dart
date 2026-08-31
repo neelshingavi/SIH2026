@@ -1,16 +1,22 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../db/database.dart';
 import 'auth_service.dart';
 
+import '../config/env.dart';
+
 class SyncCoordinator {
   final AppDatabase db;
   final AuthService auth = AuthService();
-  final String baseUrl = 'http://localhost:3001';
-  final String syncUrl = 'http://localhost:3001/sync/push';
-  final String pullUrl = 'http://localhost:3001/sync/pull';
+  Timer? _syncTimer;
+  bool _isSyncing = false;
+  
+  final String baseUrl = AppConfig.gatewayBaseUrl;
+  final String syncUrl = AppConfig.syncPushUrl;
+  final String pullUrl = AppConfig.syncPullUrl;
 
   SyncCoordinator(this.db);
 

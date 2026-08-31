@@ -52,4 +52,4 @@ export class AppModule implements NestModule {
       .apply(CorrelationIdMiddleware)
       .forRoutes('*');
   }
-
+}

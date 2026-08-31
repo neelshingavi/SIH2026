@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'config/env.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
@@ -473,7 +474,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     // Check backend reachability manually
     bool reachable = false;
     try {
-      final res = await http.get(Uri.parse('http://localhost:3001/health')).timeout(const Duration(seconds: 2));
+      final res = await http.get(Uri.parse(AppConfig.healthUrl)).timeout(const Duration(seconds: 2));
       reachable = res.statusCode == 200;
     } catch (_) {}
 

@@ -70,7 +70,7 @@ export class TriageService {
 
     // Fetch Observations linked to this encounter
     const obsBundle = await this.fhirService.getResource('Observation', `?encounter=Encounter/\${encounterId}`);
-    const observations = obsBundle?.entry?.map(e => e.resource) || [];
+    const observations = obsBundle?.entry?.map((e: any) => e.resource) || [];
 
     // Extract values
     const variables: Record<string, number> = {};

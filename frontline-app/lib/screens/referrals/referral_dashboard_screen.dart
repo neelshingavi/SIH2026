@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:frontline_app/auth/auth_service.dart';
+import '../../config/env.dart';
 
 class ReferralDashboardScreen extends StatefulWidget {
   final bool isIncoming;
@@ -30,7 +31,7 @@ class _ReferralDashboardScreenState extends State<ReferralDashboardScreen> {
       final token = await authService.getToken();
       final direction = widget.isIncoming ? 'incoming' : 'outgoing';
       
-      final url = Uri.parse('http://localhost:3000/referral?direction=$direction');
+      final url = Uri.parse('${AppConfig.referralUrl}?direction=$direction');
       final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
 
       if (response.statusCode == 200) {

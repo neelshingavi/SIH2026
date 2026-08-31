@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { StockItem } from './entities/stock.entity.js';
 import { StockMovement } from './entities/stock-movement.entity.js';
 
-const FACILITY_LOCATIONS = {
+const FACILITY_LOCATIONS: Record<string, any> = {
   'PHC-001': { lat: 18.5204, lon: 73.8567 },
   'RH-001': { lat: 18.5300, lon: 73.8600 },
   'DH-001': { lat: 18.5500, lon: 73.8900 },

@@ -23,20 +23,39 @@ export class AnalyticsService {
 
     // 2. Fetch Diagnostic Turnaround Time (TAT)
     const diagnosticReports = await this.fhirService.searchResources('DiagnosticReport', {});
-    let totalTAT = 0;
+    let totalTATMs = 0;
     let tatCount = 0;
+    
+    // We fetch ServiceRequests once to avoid N+1 querying in the loop
+    const serviceRequests = await this.fhirService.searchResources('ServiceRequest', {});
+    
     diagnosticReports.forEach((dr: any) => {
       // TAT is Issued - AuthoredOn (from ServiceRequest)
-      // Since we don't fetch full graph here efficiently, we just use the issued date vs a mock requested date for now
-      // Or we can skip complex TAT and just count pending diagnostics
+      if (dr.issued && dr.basedOn && dr.basedOn.length > 0) {
+        const srRef = dr.basedOn[0].reference;
+        const srId = srRef?.split('/')[1];
+        
+        if (srId) {
+          const req = serviceRequests.find((s: any) => s.id === srId);
+          if (req && req.authoredOn) {
+            const requestedMs = new Date(req.authoredOn).getTime();
+            const issuedMs = new Date(dr.issued).getTime();
+            if (issuedMs > requestedMs) {
+              totalTATMs += (issuedMs - requestedMs);
+              tatCount++;
+            }
+          }
+        }
+      }
     });
-    const medianTatStr = '24 hrs'; // We can compute properly if needed
+    
+    const medianTatStr = tatCount > 0 ? `\${Math.round(totalTATMs / tatCount / 3600000)} hrs` : 'N/A';
 
     // 3. Stock Availability
     const facilities = ['PHC-001', 'RH-001', 'DH-001'];
     let inStock = 0;
     let totalStockItems = 0;
-    const stockOuts = [];
+    const stockOuts: any[] = [];
 
     for (const fac of facilities) {
       const stock = await this.stockService.getAllStock(fac);
@@ -45,14 +64,14 @@ export class AnalyticsService {
         if (item.visibility !== 'OUT_OF_STOCK') {
           inStock++;
         } else {
-          stockOuts.push({ issue: `Stock out: \${item.drugName}`, phc: `Facility \${fac}`, date: new Date().toISOString() });
+          stockOuts.push({ issue: `Stock out: ${item.drugName}`, phc: `Facility ${fac}`, date: new Date().toISOString() });
         }
       });
     }
     const stockPct = totalStockItems > 0 ? Math.round((inStock / totalStockItems) * 100) : 0;
 
     // 4. SLA Breaches (Tasks stalled)
-    const slaBreaches = [];
+    const slaBreaches: any[] = [];
     referralTasks.forEach((task: any) => {
       if (task.status === 'requested' || task.status === 'accepted') {
         const authoredMs = new Date(task.authoredOn).getTime();
@@ -77,8 +96,8 @@ export class AnalyticsService {
       ],
       criticalActions: [...slaBreaches, ...stockOuts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10),
       referralBars: facilities.map(fac => {
-        const facTasks = referralTasks.filter(t => t.requester?.reference === `Organization/\${fac}`);
-        const c = facTasks.filter(t => t.status === 'completed').length;
+        const facTasks = referralTasks.filter((t: any) => t.requester?.reference === `Organization/\${fac}`);
+        const c = facTasks.filter((t: any) => t.status === 'completed').length;
         const p = facTasks.length > 0 ? Math.round((c / facTasks.length) * 100) : 0;
         return { phc: fac, pct: p, color: p > 80 ? '#0f766e' : (p > 50 ? '#f59e0b' : '#ef4444') };
       }),

@@ -53,8 +53,28 @@ export class FhirService {
         })
       );
       return response.data;
-    } catch (e) {
+    } catch (e: any) {
       if (e.response?.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async searchResources(resourceType: string, queryParams: any) {
+    try {
+      // Build query string
+      const searchParams = new URLSearchParams(queryParams);
+      const qs = searchParams.toString();
+      const url = `\${this.fhirBaseUrl}/\${resourceType}\${qs ? '?' + qs : ''}`;
+      
+      const response = await lastValueFrom(
+        this.httpService.get(url, {
+          headers: { 'Accept': 'application/fhir+json' },
+        })
+      );
+      // HAPI returns a Bundle. Return the extracted resources.
+      return response.data?.entry?.map((e: any) => e.resource) || [];
+    } catch (e: any) {
+      this.logger.error(`Error searching \${resourceType}: \${e.message}`);
       throw e;
     }
   }
@@ -67,7 +87,7 @@ export class FhirService {
         })
       );
       return response.data;
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error(`Error fetching patient timeline for \${patientId}`, e.message);
       throw e;
     }

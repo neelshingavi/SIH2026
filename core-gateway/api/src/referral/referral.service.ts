@@ -10,7 +10,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   'in-progress': ['completed', 'failed'],
 };
 
-const FACILITY_LOCATIONS = {
+const FACILITY_LOCATIONS: Record<string, { lat: number; lon: number }> = {
   'PHC-001': { lat: 18.5204, lon: 73.8567 },
   'RH-001': { lat: 18.5300, lon: 73.8600 },
   'DH-001': { lat: 18.5500, lon: 73.8900 },
@@ -43,8 +43,8 @@ export class ReferralService {
       if (!bundle || !bundle.entry) return [];
 
       return bundle.entry
-        .map(e => e.resource)
-        .filter(task => {
+        .map((e: any) => e.resource)
+        .filter((task: any) => {
           if (task.resourceType !== 'Task') return false;
           if (task.intent !== 'order') return false;
 
@@ -60,7 +60,7 @@ export class ReferralService {
 
           return true;
         });
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error('Failed to search referrals', e);
       return [];
     }
@@ -69,7 +69,7 @@ export class ReferralService {
   async getDestinations(serviceType: string, originFacilityId: string = 'PHC-001') {
     try {
       const bundle = await this.fhirService.getResource('Organization', '');
-      const organizations = bundle?.entry?.map(e => e.resource) || [];
+      const organizations = bundle?.entry?.map((e: any) => e.resource) || [];
       const origin = FACILITY_LOCATIONS[originFacilityId] || { lat: 18.5, lon: 73.8 };
       const scoredDestinations = [];
 
@@ -77,7 +77,7 @@ export class ReferralService {
         if (org.resourceType !== 'Organization') continue;
         if (org.id === originFacilityId) continue; // Don't route to self
         
-        const capabilities = org.type?.[0]?.coding?.map(c => c.display) || ['General Medicine', 'Teleconsultation'];
+        const capabilities = org.type?.[0]?.coding?.map((c: any) => c.display) || ['General Medicine', 'Teleconsultation'];
         
         let score = 50; 
         
@@ -106,7 +106,7 @@ export class ReferralService {
 
       return scoredDestinations.sort((a, b) => b.score - a.score);
 
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error('Failed to get destinations, using fallback', e);
       return [
         { id: 'FAC-DIST-1', name: 'District Hospital (Fallback)', capabilities: ['Cardiology', 'Obstetrics', 'Surgery', 'Teleconsultation'], distance: 25, queue: 12, score: 85 }
@@ -164,7 +164,7 @@ export class ReferralService {
         try {
           const sr = await this.fhirService.getResource('ServiceRequest', id);
           if (sr) entries.push({ fullUrl: `urn:uuid:\${sr.id}`, resource: sr });
-        } catch (e) {}
+        } catch (e: any) {}
       }
     }
 
@@ -177,7 +177,7 @@ export class ReferralService {
         try {
           const pat = await this.fhirService.getResource('Patient', id);
           if (pat) entries.push({ fullUrl: `urn:uuid:\${pat.id}`, resource: pat });
-        } catch (e) {}
+        } catch (e: any) {}
       }
     }
 
@@ -191,7 +191,7 @@ export class ReferralService {
 
         const encBundle = await this.fhirService.getResource('Encounter', `?subject=Patient/\${patientId}`);
         if (encBundle?.entry) entries.push(...encBundle.entry);
-      } catch (e) {}
+      } catch (e: any) {}
     }
 
     return {

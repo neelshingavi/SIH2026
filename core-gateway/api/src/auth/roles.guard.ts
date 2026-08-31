@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY, Role } from './roles.decorator.js';
 
@@ -21,9 +21,7 @@ export class RolesGuard implements CanActivate {
 
     // If user is not present (e.g. no AuthGuard before this), deny access
     if (!user || !user.roles) {
-      // In a real implementation we would throw UnauthorizedException
-      // For now, let's mock it for the sake of the skeleton
-      return false;
+      throw new UnauthorizedException('Authentication required');
     }
 
     return requiredRoles.some((role) => user.roles?.includes(role));

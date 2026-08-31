@@ -67,7 +67,7 @@ export class CarePathwayService {
     
     if (risks && risks.length > 0) {
       // Sort by date desc
-      risks.sort((a, b) => new Date(b.meta?.lastUpdated || 0).getTime() - new Date(a.meta?.lastUpdated || 0).getTime());
+      risks.sort((a: any, b: any) => new Date(b.meta?.lastUpdated || 0).getTime() - new Date(a.meta?.lastUpdated || 0).getTime());
       highestRisk = risks[0];
       const riskLevel = highestRisk.prediction?.[0]?.qualitativeRisk?.text;
       
@@ -82,13 +82,13 @@ export class CarePathwayService {
     if (isHighRisk) {
       currentState = 'ESCALATION_REQUIRED';
       // Check if a referral (ServiceRequest) exists for this risk
-      const relatedReferral = referrals.find(r => r.reasonReference?.some(ref => ref.reference === `RiskAssessment/\${highestRisk.id}`));
+      const relatedReferral = referrals.find((r: any) => r.reasonReference?.some((ref: any) => ref.reference === `RiskAssessment/\${highestRisk.id}`));
       
       if (relatedReferral) {
         currentState = 'REFERRAL_PENDING';
         
         // Find the Task for this referral
-        const referralTask = tasks.find(t => t.focus?.reference === `ServiceRequest/\${relatedReferral.id}`);
+        const referralTask = tasks.find((t: any) => t.focus?.reference === `ServiceRequest/\${relatedReferral.id}`);
         
         if (referralTask) {
           if (referralTask.status === 'accepted') {
@@ -159,10 +159,10 @@ export class CarePathwayService {
     }
 
     // Check Follow-ups
-    const activeCarePlans = carePlans.filter(cp => cp.status === 'active');
+    const activeCarePlans = carePlans.filter((cp: any) => cp.status === 'active');
     for (const cp of activeCarePlans) {
       // Find related follow-up tasks
-      const followupTasks = tasks.filter(t => t.basedOn?.some(ref => ref.reference === `CarePlan/\${cp.id}`) && t.status !== 'completed' && t.status !== 'cancelled');
+      const followupTasks = tasks.filter((t: any) => t.basedOn?.some((ref: any) => ref.reference === `CarePlan/\${cp.id}`) && t.status !== 'completed' && t.status !== 'cancelled');
       
       for (const ft of followupTasks) {
         // Check if overdue
@@ -198,7 +198,7 @@ export class CarePathwayService {
     }
 
     // Check Diagnostics
-    const diagnosticRequests = referrals.filter(r => r.code?.coding?.[0]?.system === 'http://loinc.org');
+    const diagnosticRequests = referrals.filter((r: any) => r.code?.coding?.[0]?.system === 'http://loinc.org');
     const diagnosticReports = await this.fhirService.searchResources('DiagnosticReport', { subject: `Patient/\${patientId}` });
 
     for (const sr of diagnosticRequests) {
@@ -207,7 +207,7 @@ export class CarePathwayService {
         const ageHours = (Date.now() - authoredMs) / 3600000;
         
         // Find if report exists
-        const report = diagnosticReports.find(r => r.basedOn?.some(ref => ref.reference === `ServiceRequest/\${sr.id}`));
+        const report = diagnosticReports.find((r: any) => r.basedOn?.some((ref: any) => ref.reference === `ServiceRequest/\${sr.id}`));
         
         if (!report) {
           if (ageHours > 24) {
@@ -235,8 +235,8 @@ export class CarePathwayService {
         } else {
           // Report exists, check for review (we can use an extension or task to track review.
           // For now, if the report is 'final' but no Task linking to it is completed, it's pending review)
-          const reviewTasks = tasks.filter(t => t.focus?.reference === `DiagnosticReport/\${report.id}`);
-          const isReviewed = reviewTasks.some(t => t.status === 'completed');
+          const reviewTasks = tasks.filter((t: any) => t.focus?.reference === `DiagnosticReport/\${report.id}`);
+          const isReviewed = reviewTasks.some((t: any) => t.status === 'completed');
           
           if (!isReviewed) {
             const issuedMs = new Date(report.issued).getTime();
@@ -307,7 +307,7 @@ export class CarePathwayService {
         const ageHours = (Date.now() - authoredMs) / 3600000;
         
         // Find if dispensed
-        const dispense = medicationDispenses.find(d => d.authorizingPrescription?.some(ref => ref.reference === `MedicationRequest/\${medReq.id}`));
+        const dispense = medicationDispenses.find((d: any) => d.authorizingPrescription?.some((ref: any) => ref.reference === `MedicationRequest/\${medReq.id}`));
         
         if (!dispense && ageHours > 12) {
           currentState = 'TREATMENT_PENDING';

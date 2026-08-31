@@ -20,7 +20,7 @@ export class ReferralController {
     const tasks = await this.referralService.searchReferrals(req.user.facilityId, req.user.role, isIncoming, filters);
     
     // SLA Engine: Dynamically attach SLA status
-    return tasks.map(task => {
+    return tasks.map((task: any) => {
       let slaStatus = 'ON_TRACK';
       if (task.authoredOn) {
         const hoursSince = (new Date().getTime() - new Date(task.authoredOn).getTime()) / (1000 * 60 * 60);

@@ -41,7 +41,7 @@ export class SyncService {
         }
 
         // 2. Proxy to true FHIR server (Conflict detection handled by HAPI FHIR versioning if supported)
-        let jsonPayload = op.resource.json;
+        let jsonPayload: any = op.resource.json;
         if (typeof jsonPayload === 'string') {
           jsonPayload = JSON.parse(jsonPayload);
         }
@@ -93,7 +93,7 @@ export class SyncService {
           resourceId: op.resource.id,
           status: 'APPLIED',
         });
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Error processing operation ${op.operationId}`, error.message);
         const status = error instanceof ForbiddenException ? 'FORBIDDEN' : 'SERVER_ERROR';
         

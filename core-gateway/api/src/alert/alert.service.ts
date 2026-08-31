@@ -26,7 +26,8 @@ export class AlertService {
 
     // 1. SLA Breaches (Referral pending > 48h)
     const tasks = await this.fhirService.searchResources('Task', {});
-    tasks.forEach(task => {
+
+    tasks.forEach((task: any) => {
       if ((task.status === 'requested' || task.status === 'accepted') && task.intent === 'order') {
         const authoredMs = new Date(task.authoredOn).getTime();
         const ageHours = (Date.now() - authoredMs) / 3600000;
