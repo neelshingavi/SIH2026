@@ -4,6 +4,23 @@ import { Repository } from 'typeorm';
 import { StockItem } from './entities/stock.entity.js';
 import { StockMovement } from './entities/stock-movement.entity.js';
 
+const FACILITY_LOCATIONS = {
+  'PHC-001': { lat: 18.5204, lon: 73.8567 },
+  'RH-001': { lat: 18.5300, lon: 73.8600 },
+  'DH-001': { lat: 18.5500, lon: 73.8900 },
+};
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 @Injectable()
 export class StockService {
   private readonly logger = new Logger(StockService.name);
@@ -18,7 +35,8 @@ export class StockService {
   async search(drug: string, nearFacilityId: string) {
     this.logger.log(`Searching for stock of ${drug} near ${nearFacilityId}`);
 
-    // Fetch all stock for this drug across all facilities where quantity > 0
+    const origin = FACILITY_LOCATIONS[nearFacilityId] || { lat: 18.5, lon: 73.8 };
+
     const available = await this.stockItemRepo
       .createQueryBuilder('stock')
       .where('LOWER(stock.drugName) = LOWER(:drug)', { drug })
@@ -26,25 +44,31 @@ export class StockService {
       .orderBy('stock.currentQty', 'DESC')
       .getMany();
 
-    // Mock distances for the prototype
-    return available.map((item, index) => ({
-      facilityId: item.facilityId,
-      facilityName: `Facility ${item.facilityId}`, // In real app, join with Facility table
-      quantity: item.currentQty,
-      distance: (index + 1) * 5.2, // mock distance in km
-    }));
+    return available.map((item) => {
+      const dest = FACILITY_LOCATIONS[item.facilityId] || { lat: 18.5, lon: 73.8 };
+      const dist = calculateDistance(origin.lat, origin.lon, dest.lat, dest.lon);
+      
+      let visibility = 'IN_STOCK';
+      if (item.currentQty < 20) visibility = 'LOW_STOCK';
+      if (item.currentQty === 0) visibility = 'OUT_OF_STOCK';
+
+      return {
+        facilityId: item.facilityId,
+        facilityName: `Facility ${item.facilityId}`,
+        quantity: item.currentQty,
+        visibility: visibility,
+        distance: Math.round(dist * 10) / 10, 
+      };
+    }).sort((a, b) => a.distance - b.distance);
   }
 
-  // OpenLMIS-style Stock Movement Logic
   async recordMovement(facilityId: string, drugName: string, type: 'RECEIVED' | 'DISPENSED' | 'TRANSFERRED', quantity: number) {
-    // 1. Find or create the stock item ledger line
     let stockItem = await this.stockItemRepo.findOne({ where: { facilityId, drugName }});
     if (!stockItem) {
       stockItem = this.stockItemRepo.create({ facilityId, drugName, unit: 'units', currentQty: 0 });
     }
 
-    // 2. Adjust quantity
-    if (type === 'RECEIVED' || type === 'TRANSFERRED') { // Assuming TRANSFERRED here means transferred IN.
+    if (type === 'RECEIVED' || type === 'TRANSFERRED') {
       stockItem.currentQty += quantity;
     } else if (type === 'DISPENSED') {
       if (stockItem.currentQty < quantity) throw new Error(`Insufficient stock for ${drugName} at ${facilityId}`);
@@ -53,7 +77,6 @@ export class StockService {
 
     await this.stockItemRepo.save(stockItem);
 
-    // 3. Record the audit trail movement
     const movement = this.stockMovementRepo.create({
       itemId: stockItem.id,
       type: type,
@@ -66,7 +89,17 @@ export class StockService {
   }
 
   async getAllStock(facilityId: string) {
-    return this.stockItemRepo.find({ where: { facilityId }, order: { currentQty: 'ASC' } });
+    const items = await this.stockItemRepo.find({ where: { facilityId }, order: { currentQty: 'ASC' } });
+    return items.map(item => {
+      let visibility = 'IN_STOCK';
+      if (item.currentQty < 20) visibility = 'LOW_STOCK';
+      if (item.currentQty === 0) visibility = 'OUT_OF_STOCK';
+      
+      return {
+        ...item,
+        visibility
+      };
+    });
   }
 
   async seedStock(facilityId: string) {
@@ -74,7 +107,7 @@ export class StockService {
       { name: 'Metformin 500mg', qty: 25 },
       { name: 'Amoxicillin 250mg', qty: 150 },
       { name: 'Paracetamol 500mg', qty: 300 },
-      { name: 'Telmisartan 40mg', qty: 80 },
+      { name: 'Telmisartan 40mg', qty: 15 }, // low stock example
       { name: 'Ibuprofen 400mg', qty: 120 },
       { name: 'ORS Packets', qty: 50 },
     ];

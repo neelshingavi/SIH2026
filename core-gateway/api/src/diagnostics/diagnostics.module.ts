@@ -1,15 +1,10 @@
 import { Module } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { DiagnosticsService } from './diagnostics.service.js';
 import { DiagnosticsController } from './diagnostics.controller.js';
-import { DiagnosticOrder } from './entities/diagnostic.entity.js';
+import { FhirModule } from '../fhir/fhir.module.js';
 
 @Module({
-  imports: [
-    HttpModule,
-    TypeOrmModule.forFeature([DiagnosticOrder])
-  ],
+  imports: [FhirModule],
   controllers: [DiagnosticsController],
   providers: [DiagnosticsService],
   exports: [DiagnosticsService],

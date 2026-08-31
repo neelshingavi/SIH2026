@@ -139,10 +139,42 @@ class SyncCoordinator {
 
   Future<void> _pullData() async {
     try {
-      final response = await http.get(Uri.parse('\$pullUrl?since=2020-01-01T00:00:00Z'));
+      final token = await auth.getToken();
+      
+      // Pull FHIR resources (existing stub)
+      final response = await http.get(Uri.parse('\$pullUrl?since=2020-01-01T00:00:00Z'), headers: {
+        'Authorization': 'Bearer \$token'
+      });
       if (response.statusCode == 200) {
-        // stub
+        // stub: real app parses Bundle and updates local db
       }
+
+      // Pull Inventory Cache
+      final userResponse = await http.get(Uri.parse('\$baseUrl/auth/me'), headers: {
+        'Authorization': 'Bearer \$token'
+      });
+      if (userResponse.statusCode == 200) {
+        final userData = jsonDecode(userResponse.body);
+        final facilityId = userData['facilityId'] ?? 'PHC-001';
+
+        final invResponse = await http.get(Uri.parse('\$baseUrl/stock?facilityId=\$facilityId'), headers: {
+          'Authorization': 'Bearer \$token'
+        });
+
+        if (invResponse.statusCode == 200) {
+          final inventoryData = jsonDecode(invResponse.body);
+          
+          await db.into(db.localResources).insertOnConflictUpdate(
+            LocalResourcesCompanion.insert(
+              id: 'inventory_\$facilityId',
+              resourceType: 'InventoryCache',
+              jsonPayload: jsonEncode(inventoryData),
+              syncStatus: 'SYNCED',
+            )
+          );
+        }
+      }
+
     } catch (e) {
       print('Pull failed: \$e');
     }

@@ -14,7 +14,6 @@ import { ReferralModule } from './referral/referral.module.js';
 import { StockItem } from './stock/entities/stock.entity.js';
 import { StockMovement } from './stock/entities/stock-movement.entity.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
-import { DiagnosticOrder } from './diagnostics/entities/diagnostic.entity.js';
 import { FhirResource } from './sync/entities/fhir-resource.entity.js';
 import { SyncIdempotency } from './sync/entities/sync-idempotency.entity.js';
 
@@ -26,6 +25,8 @@ import { AuditEvent } from './audit/entities/audit-event.entity.js';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware.js';
 import { FhirModule } from './fhir/fhir.module.js';
 import { CareGapModule } from './care-gap/care-gap.module.js';
+import { CarePathwayModule } from './care-pathway/care-pathway.module.js';
+import { AlertModule } from './alert/alert.module.js';
 
 @Module({
   imports: [
@@ -36,11 +37,11 @@ import { CareGapModule } from './care-gap/care-gap.module.js';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'hapi',
-      entities: [StockItem, StockMovement, DiagnosticOrder, FhirResource, SyncIdempotency, User, AuditEvent],
+      entities: [StockItem, StockMovement, FhirResource, SyncIdempotency, User, AuditEvent],
       synchronize: true, // Use only in development
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
-    UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule
+    UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule, CarePathwayModule, AlertModule
   ],
   controllers: [AppController],
   providers: [AppService],

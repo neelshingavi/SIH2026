@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { FhirService } from '../fhir/fhir.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { QueueService } from '../queue/queue.service.js';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   'draft': ['requested'],
@@ -9,6 +10,23 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   'in-progress': ['completed', 'failed'],
 };
 
+const FACILITY_LOCATIONS = {
+  'PHC-001': { lat: 18.5204, lon: 73.8567 },
+  'RH-001': { lat: 18.5300, lon: 73.8600 },
+  'DH-001': { lat: 18.5500, lon: 73.8900 },
+};
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 @Injectable()
 export class ReferralService {
   private readonly logger = new Logger(ReferralService.name);
@@ -16,6 +34,7 @@ export class ReferralService {
   constructor(
     private readonly fhirService: FhirService,
     private readonly auditService: AuditService,
+    private readonly queueService: QueueService,
   ) {}
 
   async searchReferrals(facilityId: string, role: string, isIncoming: boolean, filters?: { status?: string; priority?: string; patientId?: string }) {
@@ -47,55 +66,50 @@ export class ReferralService {
     }
   }
 
-  async getDestinations(serviceType: string) {
+  async getDestinations(serviceType: string, originFacilityId: string = 'PHC-001') {
     try {
-      // 1. Fetch organizations/healthcare services from FHIR
       const bundle = await this.fhirService.getResource('Organization', '');
       const organizations = bundle?.entry?.map(e => e.resource) || [];
-      
+      const origin = FACILITY_LOCATIONS[originFacilityId] || { lat: 18.5, lon: 73.8 };
       const scoredDestinations = [];
 
       for (const org of organizations) {
         if (org.resourceType !== 'Organization') continue;
+        if (org.id === originFacilityId) continue; // Don't route to self
         
-        // Mocking capability extraction - in reality we'd check HealthcareService resources linked to the Org
-        // Or check extensions on the Organization
         const capabilities = org.type?.[0]?.coding?.map(c => c.display) || ['General Medicine', 'Teleconsultation'];
         
-        // Score calculation (Mocked rule engine based on capability)
         let score = 50; 
         
-        // Bonus for having the requested service
         if (serviceType && capabilities.includes(serviceType)) {
           score += 30;
         }
 
-        // Mock distance penalty
-        const mockDistance = Math.floor(Math.random() * 50) + 1;
-        score -= (mockDistance * 0.5);
+        const destLoc = FACILITY_LOCATIONS[org.id] || { lat: 18.55, lon: 73.89 };
+        const dist = calculateDistance(origin.lat, origin.lon, destLoc.lat, destLoc.lon);
+        score -= (dist * 0.5);
 
-        // Mock queue penalty
-        const mockQueue = Math.floor(Math.random() * 15);
-        score -= (mockQueue * 1.5);
+        // Queue Intelligence
+        const queue = await this.queueService.getQueueByFacility(org.id);
+        const waitingCount = queue.filter(q => q.status === 'WAITING').length;
+        score -= (waitingCount * 1.5);
 
         scoredDestinations.push({
           id: org.id,
           name: org.name || 'Unknown Facility',
           capabilities,
-          distance: mockDistance,
-          queue: mockQueue,
+          distance: Math.round(dist * 10) / 10,
+          queue: waitingCount,
           score: Math.max(0, Math.floor(score))
         });
       }
 
-      // Sort by score descending
       return scoredDestinations.sort((a, b) => b.score - a.score);
 
     } catch (e) {
       this.logger.error('Failed to get destinations, using fallback', e);
       return [
-        { id: 'FAC-DIST-1', name: 'District Hospital (Fallback)', capabilities: ['Cardiology', 'Obstetrics', 'Surgery', 'Teleconsultation'], distance: 25, queue: 12, score: 85 },
-        { id: 'FAC-RURAL-1', name: 'Rural Hospital (Fallback)', capabilities: ['Obstetrics', 'Emergency', 'Teleconsultation'], distance: 10, queue: 4, score: 92 }
+        { id: 'FAC-DIST-1', name: 'District Hospital (Fallback)', capabilities: ['Cardiology', 'Obstetrics', 'Surgery', 'Teleconsultation'], distance: 25, queue: 12, score: 85 }
       ];
     }
   }
@@ -137,14 +151,12 @@ export class ReferralService {
   }
 
   async getReferralPacket(taskId: string) {
-    // 1. Get Task
     const task = await this.fhirService.getResource('Task', taskId);
     if (!task) throw new NotFoundException('Task not found');
 
     const entries = [];
     entries.push({ fullUrl: `urn:uuid:\${task.id}`, resource: task });
 
-    // 2. Get ServiceRequest
     const reqRef = task.focus?.reference;
     if (reqRef) {
       const [type, id] = reqRef.split('/');
@@ -156,7 +168,6 @@ export class ReferralService {
       }
     }
 
-    // 3. Get Patient
     const patRef = task.for?.reference;
     let patientId = null;
     if (patRef) {
@@ -170,7 +181,6 @@ export class ReferralService {
       }
     }
 
-    // 4. Get recent Encounters, Observations, Conditions for the Patient
     if (patientId) {
       try {
         const obsBundle = await this.fhirService.getResource('Observation', `?subject=Patient/\${patientId}`);

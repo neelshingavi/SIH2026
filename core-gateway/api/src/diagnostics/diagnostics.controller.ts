@@ -14,10 +14,10 @@ export class DiagnosticsController {
   orderTest(@Body() body: any) {
     return this.diagnosticsService.orderTest(
       body.patientId || 'pat-123',
-      body.patientName || 'Unknown Patient',
       body.testCode || '1234-5',
       body.testName || 'General Lab Test',
-      body.providerId || 'MO-1'
+      body.providerId || 'MO-1',
+      body.destinationFacilityId || 'PHC-001'
     );
   }
 
@@ -26,7 +26,8 @@ export class DiagnosticsController {
     return this.diagnosticsService.submitResult(
       id,
       body.resultValue || 0,
-      body.resultUnit || ''
+      body.resultUnit || '',
+      body.testName || 'General Lab Test'
     );
   }
 }
