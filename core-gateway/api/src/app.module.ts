@@ -25,6 +25,7 @@ import { User } from './users/entities/user.entity.js';
 import { AuditEvent } from './audit/entities/audit-event.entity.js';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware.js';
 import { FhirModule } from './fhir/fhir.module.js';
+import { CareGapModule } from './care-gap/care-gap.module.js';
 
 @Module({
   imports: [
@@ -39,7 +40,7 @@ import { FhirModule } from './fhir/fhir.module.js';
       synchronize: true, // Use only in development
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
-    UsersModule, AuthModule, AuditModule, FhirModule
+    UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -50,5 +51,4 @@ export class AppModule implements NestModule {
       .apply(CorrelationIdMiddleware)
       .forRoutes('*');
   }
-}
 

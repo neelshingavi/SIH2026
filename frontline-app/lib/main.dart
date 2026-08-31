@@ -15,6 +15,7 @@ import 'repositories/condition_repository.dart';
 import 'services/sync_coordinator.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
+import 'screens/dashboard/care_gap_dashboard_screen.dart';
 
 void main() {
   runApp(const SetuApp());
@@ -266,6 +267,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: _openAncForm,
               icon: const Icon(Icons.monitor_heart),
               label: const Text("ANC Form (High-Risk Test)"),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const CareGapDashboardScreen()));
+              },
+              icon: const Icon(Icons.assignment_late),
+              label: const Text("Care Gap Dashboard"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade100),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
