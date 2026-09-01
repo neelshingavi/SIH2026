@@ -34,27 +34,17 @@ export default function TeleconsultPage() {
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
-    // Simulate network delay
     setTimeout(() => {
-      // Look in localStorage first
       const stored = localStorage.getItem('teleconsult_demo_queue');
       if (stored) {
         setQueue(JSON.parse(stored));
+      } else {
+        setQueue([]);
       }
       setLoading(false);
-    }, 500);
+    }, 300);
   }, []);
 
-  const seed = async () => {
-    setLoading(true);
-    const demoData: Teleconsult[] = [
-      { id: 't1', hubFacilityId: FACILITY, spokeFacilityId: 'SC-Kondhwa', patientName: 'Sunita Sharma', condition: 'Chest pain, referred from ASHA', priority: 'high', status: 'WAITING', createdAt: new Date().toISOString() },
-      { id: 't2', hubFacilityId: FACILITY, spokeFacilityId: 'SC-Wagholi', patientName: 'Ravi Kumar', condition: 'High fever', priority: 'routine', status: 'WAITING', createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString() },
-    ];
-    localStorage.setItem('teleconsult_demo_queue', JSON.stringify(demoData));
-    setQueue(demoData);
-    setLoading(false);
-  };
 
   const updateStatus = async (id: string, status: Status) => {
     const updatedQueue = queue.map(q => {
@@ -96,7 +86,6 @@ export default function TeleconsultPage() {
         <div style={{ ...s.card, width: '300px', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.875rem' }}>Incoming Requests</span>
-            <button onClick={seed} style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', cursor: 'pointer' }}>🌱 Demo Data</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (

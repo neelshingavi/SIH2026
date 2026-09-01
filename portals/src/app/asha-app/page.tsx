@@ -120,15 +120,15 @@ export default function AshaApp() {
 
           <div style={s.statsContainer}>
             <div style={s.statCard}>
-              <div style={s.statValue}>142</div>
-              <div style={s.statLabel}>Families Covered</div>
+              <div style={s.statValue}>{pendingSync}</div>
+              <div style={s.statLabel}>Pending Sync</div>
             </div>
             <div style={s.statCard}>
-              <div style={s.statValue}>8</div>
-              <div style={s.statLabel}>Pending Visits</div>
+              <div style={s.statValue}>0</div>
+              <div style={s.statLabel}>Visits Today</div>
             </div>
             <div style={s.statCard}>
-              <div style={s.statValue}>3</div>
+              <div style={s.statValue}>0</div>
               <div style={s.statLabel}>High Risk ANC</div>
             </div>
           </div>

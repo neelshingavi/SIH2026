@@ -44,11 +44,8 @@ export default function MODashboard() {
   const [emrLoading, setEmrLoading] = useState(false);
 
   // Prescription State
-  const [prescriptions, setPrescriptions] = useState<any[]>([
-    { id: 1, name: 'Tab. Amlodipine 5mg', dose: '1', freq: 'OD (Morning)', duration: '30 Days' },
-    { id: 2, name: 'Tab. Telmisartan 40mg', dose: '1', freq: 'OD (Morning)', duration: '30 Days' }
-  ]);
-  const [advice, setAdvice] = useState('Low salt diet, regular exercise, BP monitoring.');
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  const [advice, setAdvice] = useState('');
   const [rxSent, setRxSent] = useState(false);
   const [stockRequested, setStockRequested] = useState(false);
   const [lowestStock, setLowestStock] = useState<any>(null);
@@ -219,10 +216,10 @@ export default function MODashboard() {
             </div>
             <div style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {[
-                { label: 'Registration', count: 12, bg: '#0f766e', color: 'white' },
-                { label: 'Triage', count: 18, bg: '#0ea5e9', color: 'white' },
-                { label: 'Doctor Consult', count: 6, bg: 'white', color: '#0ea5e9', border: '1px solid #0ea5e9' },
-                { label: 'Pharmacy / Lab', count: 6, bg: 'white', color: '#10b981', border: '1px solid #10b981' },
+                { label: 'Registration', count: 0, bg: '#0f766e', color: 'white' },
+                { label: 'Triage', count: 0, bg: '#0ea5e9', color: 'white' },
+                { label: 'Doctor Consult', count: activeQueue.length, bg: 'white', color: '#0ea5e9', border: '1px solid #0ea5e9' },
+                { label: 'Pharmacy / Lab', count: diagOrders.length, bg: 'white', color: '#10b981', border: '1px solid #10b981' },
               ].map((step, i, arr) => (
                 <React.Fragment key={step.label}>
                   <div style={{ flex: 1, background: step.bg, color: step.color, border: (step as any).border, padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 600, display: 'flex', gap: '0.25rem', flexDirection: 'column', textAlign: 'center' }}>
@@ -237,7 +234,7 @@ export default function MODashboard() {
 
           {/* KPI chips */}
           {[
-            { label: "Today's OPD", value: '42', icon: '👥', color: '#3b82f6' },
+            { label: "Today's OPD", value: activeQueue.length, icon: '👥', color: '#3b82f6' },
             { label: 'Queued Teleconsults', value: activeQueue.length, icon: '📹', color: '#0ea5e9' },
             { label: 'Pending Lab Reports', value: diagOrders.filter(o => o.status === 'PENDING').length, icon: '🔬', color: '#10b981' },
           ].map(k => (
@@ -252,7 +249,6 @@ export default function MODashboard() {
         {/* ── MAIN GRID ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr 320px', gap: '1rem', flex: 1, minHeight: 0 }}>
 
-          {/* LEFT: Queue */}
           {/* LEFT: Queues */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
             
@@ -262,17 +258,9 @@ export default function MODashboard() {
                 ASHA Synced Patients
                 <span style={{ background: '#ecfdf5', color: '#10b981', padding: '0.125rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem' }}>Live Sync</span>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: '#eff6ff' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.2rem' }}>Registered 2 mins ago</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
-                    <span style={{ fontWeight: 600, color: '#1e293b' }}>Sunita Sharma (45F)</span>
-                  </div>
-                  <button onClick={() => {
-                    alert('Initiating Teleconsultation with Expert for Sunita Sharma...');
-                  }} style={{ marginTop: '0.5rem', width: '100%', padding: '0.375rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}>
-                    Refer to Expert 📹
-                  </button>
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', margin: 'auto' }}>
+                  No pending synced patients from ASHA workers.
                 </div>
               </div>
             </div>
