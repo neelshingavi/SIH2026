@@ -28,6 +28,10 @@ export class QueueService {
     bpVital?: string;
     spo2Vital?: string;
     tempVital?: string;
+    weight?: string;
+    hb?: string;
+    previousCheckup?: string;
+    healthStatus?: string;
   }) {
     // Auto-increment token per facility
     const count = await this.queueRepo.count({ where: { facilityId: dto.facilityId } });
@@ -39,6 +43,10 @@ export class QueueService {
       bpVital: dto.bpVital ?? '',
       spo2Vital: dto.spo2Vital ?? '',
       tempVital: dto.tempVital ?? '',
+      weight: dto.weight ?? '',
+      hb: dto.hb ?? '',
+      previousCheckup: dto.previousCheckup ?? '',
+      healthStatus: dto.healthStatus ?? '',
     });
     return this.queueRepo.save(entry);
   }
