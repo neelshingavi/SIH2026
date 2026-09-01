@@ -33,11 +33,11 @@ services:
       context: ./portals
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://192.168.1.14:3001
+        NEXT_PUBLIC_API_URL: http://localhost:3001
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://192.168.1.14:3001
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
     depends_on:
       - core-gateway
 

@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 part 'database.g.dart';
 
@@ -297,6 +299,22 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'setu_local.sqlite'));
-    return NativeDatabase.createInBackground(file);
+    
+    // Fetch or generate encryption key
+    const storage = FlutterSecureStorage();
+    String? encryptionKey = await storage.read(key: 'db_encryption_key');
+    if (encryptionKey == null) {
+      final random = Random.secure();
+      final keyBytes = List<int>.generate(32, (i) => random.nextInt(256));
+      encryptionKey = base64UrlEncode(keyBytes);
+      await storage.write(key: 'db_encryption_key', value: encryptionKey);
+    }
+
+    return NativeDatabase.createInBackground(
+      file,
+      setup: (db) {
+        db.execute("PRAGMA key = '$encryptionKey';");
+      },
+    );
   });
 }

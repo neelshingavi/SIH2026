@@ -38,11 +38,12 @@ export default function AshaApp() {
           abhaNumber: p.abhaNumber,
           fullName: p.fullName,
           gender: p.gender,
+          age: p.dob,
           dateOfBirth: new Date(new Date().setFullYear(new Date().getFullYear() - parseInt(p.dob))).toISOString(), // Approx DOB from age
           contactNumber: p.mobile,
           village: p.village,
           registeredBy: user?.username,
-          facilityId: user?.facilityId
+          facilityId: 'PHC-001' // Send to PHC for triage
         };
         await apiPost('/patient/register', payload);
         if (p.id) await markPatientAsSynced(p.id);
@@ -203,7 +204,7 @@ export default function AshaApp() {
 
             <div style={s.inputGroup}>
               <label style={s.label}>Phone Number *</label>
-              <input required type="tel" pattern="[0-9]{10}" style={s.input} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="10-digit mobile number" />
+              <input required type="tel" style={s.input} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Mobile number" />
             </div>
 
             <div style={s.inputGroup}>

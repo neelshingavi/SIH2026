@@ -42,6 +42,7 @@ import { DiagnosticOrder } from './diagnostics/entities/diagnostic.entity.js';
 import { ReferralEntry } from './referral/entities/referral-entry.entity.js';
 import { PrescriptionModule } from './prescription/prescription.module.js';
 import { PrescriptionEntry } from './prescription/entities/prescription-entry.entity.js';
+import { SmsModule } from './sms/sms.module.js';
 
 @Global()
 @Module({
@@ -65,7 +66,7 @@ export class TerminologyModule {}
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
     UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule, CarePathwayModule, AlertModule,
-    ConsentModule, HieModule, AbdmModule, HealthModule, TerminologyModule, PrescriptionModule
+    ConsentModule, HieModule, AbdmModule, HealthModule, TerminologyModule, PrescriptionModule, SmsModule
   ],
   controllers: [AppController],
   providers: [AppService, StructuredLogger],
