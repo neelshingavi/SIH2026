@@ -100,7 +100,7 @@ export class ConsentService {
     return bundle;
   }
 
-  async checkActiveConsent(patientId: string, facilityId: string, purpose: string): Promise<boolean> {
+  async checkActiveConsent(patientId: string, facilityId: string, purpose: string): Promise<{ hasConsent: boolean, permittedResources?: string[] }> {
     const consents = await this.getConsentsForPatient(patientId);
     const now = new Date();
 
@@ -115,17 +115,18 @@ export class ConsentService {
           }
           
           // Check organization
-          const orgMatch = consent.organization?.some((org: any) => org.reference === `Organization/\${facilityId}`);
+          const orgMatch = consent.organization?.some((org: any) => org.reference === `Organization/${facilityId}`);
           
           // Check purpose
           const purposeMatch = provision.purpose?.some((p: any) => p.code === purpose);
 
           if (orgMatch && purposeMatch) {
-            return true;
+            const permittedResources = provision.data?.map((d: any) => d.reference?.type).filter(Boolean);
+            return { hasConsent: true, permittedResources };
           }
         }
       }
     }
-    return false;
+    return { hasConsent: false };
   }
 }

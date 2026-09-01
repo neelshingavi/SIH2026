@@ -5,6 +5,7 @@ import { SyncOperationDto } from './sync.controller.js';
 import { SyncIdempotency } from './entities/sync-idempotency.entity.js';
 import { FhirService } from '../fhir/fhir.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { HieOutboxService } from '../hie/hie-outbox.service.js';
 
 @Injectable()
 export class SyncService {
@@ -15,6 +16,7 @@ export class SyncService {
     private readonly idempRepo: Repository<SyncIdempotency>,
     private readonly fhirService: FhirService,
     private readonly auditService: AuditService,
+    private readonly hieOutboxService: HieOutboxService,
   ) {}
 
   async push(operations: SyncOperationDto[], user: any, correlationId: string) {
@@ -57,6 +59,29 @@ export class SyncService {
             op.resource.versionId,
             op.operation
           );
+
+          // Phase 21/29: Offline Exchange Trigger
+          if (op.resource.resourceType === 'CommunicationRequest') {
+            const isExchangePending = jsonPayload.extension?.some((ext: any) => ext.url === 'http://setu.in/fhir/StructureDefinition/exchange-status' && ext.valueString === 'EXCHANGE_PENDING');
+            if (isExchangePending) {
+              const patientRef = jsonPayload.subject?.reference;
+              const patientId = patientRef ? patientRef.split('/')[1] : null;
+              const orgRef = jsonPayload.recipient?.[0]?.reference;
+              const recipientFacilityId = orgRef ? orgRef.split('/')[1] : null;
+              
+              if (patientId && recipientFacilityId) {
+                this.hieOutboxService.queueExport(
+                  patientId, 
+                  recipientFacilityId, 
+                  jsonPayload.priority === 'stat' ? 'EMERGENCY' : (jsonPayload.priority === 'urgent' ? 'URGENT' : 'ROUTINE'),
+                  jsonPayload.priority === 'stat' ? 'EMERGENCY' : (jsonPayload.priority === 'urgent' ? 'URGENT' : 'ROUTINE'), // mapping FHIR priority to Priority enum and purpose
+                  user, 
+                  correlationId, 
+                  op.idempotencyKey
+                );
+              }
+            }
+          }
         } catch (fhirError: any) {
           if (fhirError.message === 'FHIR_CONFLICT') {
             await this._markIdempotency(op, 'CONFLICT');

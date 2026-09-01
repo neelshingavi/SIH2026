@@ -19,10 +19,10 @@ export class HieService {
   // ... (exportClinicalSummary remains unchanged, skipping lines for brevity)
 
   async exportClinicalSummary(patientId: string, recipientFacilityId: string, purpose: string, user: any, correlationId: string) {
-    this.logger.log(`Exporting clinical summary for patient \${patientId} to \${recipientFacilityId}`);
+    this.logger.log(`Exporting clinical summary for patient ${patientId} to ${recipientFacilityId}`);
 
-    // 1. Consent Verification
-    const hasConsent = await this.consentService.checkActiveConsent(patientId, recipientFacilityId, purpose);
+    // 1. Consent Verification (Phase 4, 5, 6, 7)
+    const { hasConsent, permittedResources } = await this.consentService.checkActiveConsent(patientId, recipientFacilityId, purpose);
     if (!hasConsent) {
       await this.auditService.logEvent({
         userId: user.userId,
@@ -41,34 +41,61 @@ export class HieService {
     const patient = await this.fhirService.getResource('Patient', patientId);
     if (!patient) throw new NotFoundException('Patient not found');
 
-    const encounters = await this.fhirService.searchResources('Encounter', { subject: `Patient/\${patientId}` });
-    const observations = await this.fhirService.searchResources('Observation', { subject: `Patient/\${patientId}` });
-    const conditions = await this.fhirService.searchResources('Condition', { subject: `Patient/\${patientId}` });
-    const carePlans = await this.fhirService.searchResources('CarePlan', { subject: `Patient/\${patientId}` });
-    const serviceRequests = await this.fhirService.searchResources('ServiceRequest', { subject: `Patient/\${patientId}` });
-    const diagnosticReports = await this.fhirService.searchResources('DiagnosticReport', { subject: `Patient/\${patientId}` });
-    const medicationRequests = await this.fhirService.searchResources('MedicationRequest', { subject: `Patient/\${patientId}` });
-    const risks = await this.fhirService.searchResources('RiskAssessment', { subject: `Patient/\${patientId}` });
+    const isPermitted = (rt: string) => !permittedResources || permittedResources.includes(rt);
 
-    const activeConditions = conditions.filter((c: any) => c.clinicalStatus?.coding?.[0]?.code === 'active');
+    const bundleEntries = [];
+    bundleEntries.push({ fullUrl: `urn:uuid:${patientId}`, resource: patient });
+
+    if (isPermitted('Encounter')) {
+      const encounters = await this.fhirService.searchResources('Encounter', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...encounters.slice(0, 5).map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
     
+    if (isPermitted('Observation')) {
+      const observations = await this.fhirService.searchResources('Observation', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...observations.slice(0, 10).map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
+    if (isPermitted('Condition')) {
+      const conditions = await this.fhirService.searchResources('Condition', { subject: `Patient/${patientId}` });
+      const activeConditions = conditions.filter((c: any) => c.clinicalStatus?.coding?.[0]?.code === 'active');
+      bundleEntries.push(...activeConditions.map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
+    if (isPermitted('CarePlan')) {
+      const carePlans = await this.fhirService.searchResources('CarePlan', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...carePlans.map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
+    if (isPermitted('ServiceRequest')) {
+      const serviceRequests = await this.fhirService.searchResources('ServiceRequest', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...serviceRequests.map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
+    if (isPermitted('DiagnosticReport')) {
+      const diagnosticReports = await this.fhirService.searchResources('DiagnosticReport', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...diagnosticReports.map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
+    if (isPermitted('MedicationRequest')) {
+      const medicationRequests = await this.fhirService.searchResources('MedicationRequest', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...medicationRequests.map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
+    if (isPermitted('RiskAssessment')) {
+      const risks = await this.fhirService.searchResources('RiskAssessment', { subject: `Patient/${patientId}` });
+      bundleEntries.push(...risks.map((r: any) => ({ fullUrl: `urn:uuid:${r.id}`, resource: r })));
+    }
+
     const bundleId = crypto.randomUUID();
+    
+    // Phase 12/15: Use type 'document' as a Continuity of Care Document structure.
     const bundle = {
       resourceType: 'Bundle',
       id: bundleId,
       type: 'document',
       timestamp: new Date().toISOString(),
-      entry: [
-        { fullUrl: `urn:uuid:\${patientId}`, resource: patient },
-        ...activeConditions.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...observations.slice(0, 10).map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...encounters.slice(0, 5).map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...carePlans.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...serviceRequests.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...diagnosticReports.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...medicationRequests.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-        ...risks.map((r: any) => ({ fullUrl: `urn:uuid:\${r.id}`, resource: r })),
-      ]
+      entry: bundleEntries
     };
 
     await this.auditService.logEvent({

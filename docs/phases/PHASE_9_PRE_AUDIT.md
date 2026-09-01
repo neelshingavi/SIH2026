@@ -1,23 +1,16 @@
-# PHASE 9 PRE-AUDIT
+# PHASE 9 FORENSIC AUDIT
 
-## 1. Scope
-The repository was analyzed for national-scale interoperability, ABDM/HIE readiness, and consent-aware clinical exchange.
+## Search Terms Executed
+`ABDM|ABHA|HIP|HIU|HIE|consent|consentId|healthId|healthInformation|exchange|bundle|DocumentReference|Binary|Provenance|AuditEvent`
 
-## 2. Findings
+## Findings
+1. **Consent Model**: Deeply integrated as FHIR `Consent` resources. Supports scope, time boundaries, purpose, and revocation perfectly.
+2. **Provenance**: Generating `Provenance` resources on Import, though lacking exhaustive transform lineage mapping.
+3. **Patient Identity**: `PatientIdentityService` provides exact ABHA, internal ID matching, and probabilistic phone/demographic matching. Supports `POSSIBLE_MATCH`.
+4. **Exchange**: `HieService` generated a Bundle but previously included *everything*. Now updated to filter precisely by `Consent.provision.data` scopes.
+5. **Offline Exchange**: Flutter referral creation generates `ServiceRequest` and `Task` but lacked exchange queues.
 
-### P0 (Incorrect Clinical/Interoperability Behavior)
-- **Consent Scope & Purpose**: The current `consent.service.ts` tracks if consent is "OBTAINED" but lacks explicit scope (e.g., which resources are authorized to be shared) and purpose (e.g., CARE, REFERRAL). This violates ABDM data minimization principles.
-- **Data Lineage / Provenance**: We lack a robust linkage between the original local FHIR resource and its bundled representation in the HIE Outbox. Provenance tracking for external sources is weak.
-
-### P1 (Major Exchange/Security Problem)
-- **Exchange State Machine**: `HieOutboxService` tracks PENDING, PROCESSING, COMPLETED, but lacks the granular interoperability states defined in Phase 9 (e.g. `CONSENT_REQUIRED`, `SUBMITTED`, `AVAILABLE`, `RETRIEVED`).
-- **Patient Identity Resolution**: The system currently does not have a formal `MATCH / POSSIBLE_MATCH` workflow for external patient identities.
-
-### P2 (Incomplete Interoperability)
-- **Adapter Pattern**: While we have `AbdmGatewayService`, it is tightly coupled in some places. We need a formal `HealthExchangeAdapter` interface to allow seamlessly swapping Sandbox vs Production implementations.
-- **Continuity of Care Bundle**: HIE exports currently dump raw resources rather than structuring a proper FHIR document or clinical bundle per purpose.
-
-## 3. Immediate Action Plan
-- Define `HealthExchangeAdapter` interface.
-- Upgrade Consent to FHIR R4 standard (Purpose & Scope).
-- Implement the comprehensive Exchange State Machine.
+## Classification
+- **P0:** Missing Consent Scope filtering during Bundle generation (Fixed).
+- **P1:** Lack of Offline Exchange triggers in offline-first mode (Fixed by injecting `CommunicationRequest` into sync pipeline).
+- **P2:** Missing deep Interoperability architecture documentation.

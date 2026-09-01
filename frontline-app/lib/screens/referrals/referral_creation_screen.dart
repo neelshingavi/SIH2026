@@ -65,6 +65,30 @@ class _ReferralCreationScreenState extends State<ReferralCreationScreen> {
         jsonPayload: jsonEncode(taskPayload),
       );
 
+      // Phase 21/29: Offline Exchange (Triggered by real referral workflow)
+      final exchangeRequestId = uuid.v4();
+      final exchangePayload = {
+        'resourceType': 'CommunicationRequest',
+        'id': exchangeRequestId,
+        'status': 'draft',
+        'priority': _urgency,
+        'subject': {'reference': 'Patient/${widget.patientId}'},
+        'about': [{'reference': 'ServiceRequest/$serviceRequestId'}],
+        'recipient': [{'reference': 'Organization/$_destinationFacility'}],
+        'payload': [{'contentString': 'Referral context exchange'}],
+        'authoredOn': DateTime.now().toIso8601String(),
+        'extension': [{
+          'url': 'http://setu.in/fhir/StructureDefinition/exchange-status',
+          'valueString': 'EXCHANGE_PENDING'
+        }]
+      };
+
+      await syncCoordinator.persistLocally(
+        resourceType: 'CommunicationRequest',
+        id: exchangeRequestId,
+        jsonPayload: jsonEncode(exchangePayload),
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral created locally. Will sync when online.')));
         Navigator.pop(context);
