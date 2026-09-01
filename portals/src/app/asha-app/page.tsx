@@ -14,7 +14,14 @@ export default function AshaApp() {
     age: '',
     gender: 'Female',
     phone: '',
-    address: ''
+    address: '',
+    weight: '',
+    hb: '',
+    bp: '',
+    oxygen: '',
+    temperature: '',
+    previousCheckup: '',
+    healthStatus: ''
   });
 
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -42,6 +49,13 @@ export default function AshaApp() {
           dateOfBirth: new Date(new Date().setFullYear(new Date().getFullYear() - parseInt(p.dob))).toISOString(), // Approx DOB from age
           contactNumber: p.mobile,
           village: p.village,
+          weight: p.weight,
+          hb: p.hb,
+          bp: p.bp,
+          oxygen: p.oxygen,
+          temperature: p.temperature,
+          previousCheckup: p.previousCheckup,
+          healthStatus: p.healthStatus,
           registeredBy: user?.username,
           facilityId: 'PHC-001' // Send to PHC for triage
         };
@@ -68,10 +82,17 @@ export default function AshaApp() {
         gender: form.gender,
         mobile: form.phone,
         village: form.address,
+        weight: form.weight,
+        hb: form.hb,
+        bp: form.bp,
+        oxygen: form.oxygen,
+        temperature: form.temperature,
+        previousCheckup: form.previousCheckup,
+        healthStatus: form.healthStatus,
       });
 
       setStatus('success');
-      setForm({ abhaNumber: '', name: '', age: '', gender: 'Female', phone: '', address: '' });
+      setForm({ abhaNumber: '', name: '', age: '', gender: 'Female', phone: '', address: '', weight: '', hb: '', bp: '', oxygen: '', temperature: '', previousCheckup: '', healthStatus: '' });
       setTimeout(() => {
         setStatus('idle');
         setView('dashboard');
@@ -210,6 +231,39 @@ export default function AshaApp() {
             <div style={s.inputGroup}>
               <label style={s.label}>Village / Address *</label>
               <textarea required style={{ ...s.input, minHeight: '80px', resize: 'vertical' }} value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="House details, village name..." />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={s.label}>Weight (kg)</label>
+                <input style={s.input} value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} placeholder="e.g. 65" />
+              </div>
+              <div>
+                <label style={s.label}>Hemoglobin (g/dL)</label>
+                <input style={s.input} value={form.hb} onChange={e => setForm({...form, hb: e.target.value})} placeholder="e.g. 12.5" />
+              </div>
+              <div>
+                <label style={s.label}>Blood Pressure</label>
+                <input style={s.input} value={form.bp} onChange={e => setForm({...form, bp: e.target.value})} placeholder="e.g. 120/80" />
+              </div>
+              <div>
+                <label style={s.label}>SpO2 (%)</label>
+                <input style={s.input} value={form.oxygen} onChange={e => setForm({...form, oxygen: e.target.value})} placeholder="e.g. 98" />
+              </div>
+              <div>
+                <label style={s.label}>Temperature (°F)</label>
+                <input style={s.input} value={form.temperature} onChange={e => setForm({...form, temperature: e.target.value})} placeholder="e.g. 98.6" />
+              </div>
+            </div>
+
+            <div style={s.inputGroup}>
+              <label style={s.label}>Previous Checkup Details</label>
+              <textarea style={{ ...s.input, minHeight: '60px', resize: 'vertical' }} value={form.previousCheckup} onChange={e => setForm({...form, previousCheckup: e.target.value})} placeholder="Past diagnoses, dates, outcomes..." />
+            </div>
+
+            <div style={s.inputGroup}>
+              <label style={s.label}>Current Health Status / Chief Complaint</label>
+              <textarea required style={{ ...s.input, minHeight: '60px', resize: 'vertical' }} value={form.healthStatus} onChange={e => setForm({...form, healthStatus: e.target.value})} placeholder="What is the patient experiencing today?" />
             </div>
 
             <button type="submit" disabled={status === 'loading'} style={{ ...s.btn, opacity: status === 'loading' ? 0.7 : 1 }}>
