@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { FhirService } from '../fhir/fhir.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { QueueService } from '../queue/queue.service.js';
 
 @Injectable()
 export class PatientService {
@@ -9,6 +10,7 @@ export class PatientService {
   constructor(
     private readonly fhirService: FhirService,
     private readonly auditService: AuditService,
+    private readonly queueService: QueueService,
   ) {}
 
   async checkDuplicate(patientDto: any, user: any, requestId: string) {
@@ -103,6 +105,18 @@ export class PatientService {
       resourceId: newPatient.id,
       requestId: requestId,
       result: 'SUCCESS',
+    });
+
+    // Automatically create a queue entry for PHC triage
+    const patientName = dto.fullName || dto.name || 'Unknown Patient';
+    const facilityId = user?.facilityId || dto.facilityId || 'PHC-001';
+    await this.queueService.createEntry({
+      facilityId: facilityId,
+      patientName: patientName,
+      age: dto.age ? String(dto.age) : '35',
+      gender: dto.gender || 'Female',
+      chiefComplaint: dto.village ? `ASHA Sync (Village: ${dto.village})` : 'Synced from ASHA Field App',
+      priority: 'NORMAL',
     });
 
     return {

@@ -28,6 +28,7 @@ const FACILITY = 'PHC-001';
 export default function MODashboard() {
   const [teleconsultQueue, setTeleconsultQueue] = useState<Teleconsult[]>([]);
   const [activeCall, setActiveCall] = useState<Teleconsult | null>(null);
+  const [ashaQueue, setAshaQueue] = useState<any[]>([]);
 
   // Diagnostics State
   const [diagOrders, setDiagOrders] = useState<any[]>([]);
@@ -96,6 +97,42 @@ export default function MODashboard() {
     const interval = setInterval(fetchQ, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const fetchAsha = async () => {
+      try {
+        const data = await apiGet(`/queue?facilityId=${FACILITY}`);
+        if (Array.isArray(data)) {
+          setAshaQueue(data.filter((q: any) => q.status === 'WAITING'));
+        }
+      } catch (e) { /* silent */ }
+    };
+    fetchAsha();
+    const interval = setInterval(fetchAsha, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleReferToExpert = async (patient: any) => {
+    try {
+      const stored = localStorage.getItem('teleconsult_demo_queue');
+      const currentQueue = stored ? JSON.parse(stored) : [];
+      const newConsult = {
+        id: `tc-${Date.now()}`,
+        hubFacilityId: FACILITY,
+        spokeFacilityId: 'SC-Kondhwa',
+        patientName: `${patient.patientName} (${patient.age || 35}${patient.gender?.[0] || 'F'})`,
+        condition: patient.chiefComplaint || 'Referred from ASHA',
+        priority: 'high',
+        status: 'WAITING',
+        createdAt: new Date().toISOString()
+      };
+      const updated = [newConsult, ...currentQueue];
+      localStorage.setItem('teleconsult_demo_queue', JSON.stringify(updated));
+      alert(`Patient ${patient.patientName} referred to Specialist Teleconsultation Hub!`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadOrders = async () => {
     try {
@@ -258,10 +295,29 @@ export default function MODashboard() {
                 ASHA Synced Patients
                 <span style={{ background: '#ecfdf5', color: '#10b981', padding: '0.125rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem' }}>Live Sync</span>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', margin: 'auto' }}>
-                  No pending synced patients from ASHA workers.
-                </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {ashaQueue.length === 0 ? (
+                  <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', margin: 'auto' }}>
+                    No pending synced patients from ASHA workers.
+                  </div>
+                ) : (
+                  ashaQueue.map(p => (
+                    <div key={p.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', background: '#eff6ff' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.2rem' }}>
+                        📍 {p.chiefComplaint || 'Synced from ASHA'}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#1e293b', fontWeight: 600 }}>
+                        <span>{p.patientName} ({p.age}{p.gender?.[0]})</span>
+                      </div>
+                      <button
+                        onClick={() => handleReferToExpert(p)}
+                        style={{ marginTop: '0.5rem', width: '100%', padding: '0.375rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Refer to Expert 📹
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
