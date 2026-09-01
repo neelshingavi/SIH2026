@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule, Global, RequestMethod } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -33,6 +33,8 @@ import { AbdmModule } from './abdm/abdm.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RateLimiterMiddleware } from './common/middleware/rate-limiter.middleware.js';
 import { TerminologyService } from './common/terminology/terminology.service.js';
+import { TerminologyModule } from './common/terminology/terminology.module.js';
+import { StructuredLogger } from './common/logger/structured-logger.service.js';
 
 @Global()
 @Module({
@@ -58,7 +60,7 @@ export class TerminologyModule {}
     ConsentModule, HieModule, AbdmModule, HealthModule, TerminologyModule
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, StructuredLogger],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

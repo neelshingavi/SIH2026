@@ -190,13 +190,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'resourceType': 'RiskAssessment',
       'id': riskId,
       'status': 'final',
-      'subject': { 'reference': 'Patient/\$patientId' },
-      'encounter': { 'reference': 'Encounter/\$encounterId' },
+      'subject': { 'reference': 'Patient/$patientId' },
+      'encounter': { 'reference': 'Encounter/$encounterId' },
       'method': { 'coding': [{ 'system': 'http://setu.in/protocols', 'code': result.protocolVersion }] },
-      'prediction': [{
+      'prediction': result.triggeredRules.map((r) => {
         'qualitativeRisk': { 'text': result.riskBand },
-        'rationale': result.flags.join('; ')
-      }],
+        'rationale': r['rationale'] ?? '',
+        // Phase 24: Embed ruleId and version directly in the risk prediction for complete traceability
+        'extension': [{
+          'url': 'http://setu.in/fhir/StructureDefinition/rule-version',
+          'valueString': '${r['ruleId']}@${r['version']}'
+        }, {
+          'url': 'http://setu.in/fhir/StructureDefinition/rule-source',
+          'valueString': r['source'] ?? ''
+        }]
+      }).toList(),
       'mitigation': result.recommendedAction,
       'meta': { 'lastUpdated': DateTime.now().toIso8601String() }
     };

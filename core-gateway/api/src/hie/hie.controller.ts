@@ -59,6 +59,13 @@ export class HieController {
     return this.outboxService.getMetrics();
   }
 
+  // Phase 17: Dead Letter Queue (DLQ) endpoint
+  @Get('dlq')
+  @Roles('ADMIN', 'DISTRICT_ADMIN')
+  async getDeadLetterQueue() {
+    return this.outboxService.getDeadLetterQueue();
+  }
+
   // Phase 19: Import — external FHIR data passes through identity resolution, deduplication, consent
   @Post('import')
   @Roles('MO', 'SPECIALIST', 'ADMIN')

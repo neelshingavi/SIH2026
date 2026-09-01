@@ -18,6 +18,8 @@ export interface ExchangeTask {
   user: any;
   correlationId: string;
   createdAt: Date;
+  nextRetryAt?: Date;
+  lastAttemptAt?: Date;
 }
 
 @Injectable()
@@ -85,10 +87,16 @@ export class HieOutboxService {
     this.isProcessing = true;
 
     try {
-      const pendingTasks = this.queue.filter(t => [ExchangeStatus.DRAFT, ExchangeStatus.CONSENT_GRANTED, ExchangeStatus.REQUESTED].includes(t.status));
+      const now = new Date();
+      // Phase 9: Exponential backoff - only process tasks that are due for retry
+      const pendingTasks = this.queue.filter(t => 
+        [ExchangeStatus.DRAFT, ExchangeStatus.CONSENT_GRANTED, ExchangeStatus.REQUESTED].includes(t.status) &&
+        (!t.nextRetryAt || t.nextRetryAt <= now)
+      );
 
       for (const task of pendingTasks) {
         try {
+          task.lastAttemptAt = now;
           if (task.status === ExchangeStatus.DRAFT) {
             task.status = ExchangeStatus.CONSENT_REQUIRED;
             // The HieService export includes consent checking internally,
@@ -117,13 +125,33 @@ export class HieOutboxService {
             // Assume it's processed quickly for simulation
             task.status = ExchangeStatus.AVAILABLE;
           }
-        } catch (error) {
-          this.logger.error(`Failed to process HIE export \${task.exchangeId}: \${error.message}`);
-          if (error.message.includes('No active consent')) {
+        } catch (error: any) {
+          this.logger.error(`Failed to process HIE export ${task.exchangeId}: ${error.message}`);
+          
+          // Phase 8: Distinguish retryable vs non-retryable
+          const isConsentError = error.message.includes('No active consent');
+          const isFhirConflict = error.message.includes('FHIR_CONFLICT');
+          const isNonRetryable = isConsentError || isFhirConflict || error.status === 400 || error.status === 401 || error.status === 403;
+
+          if (isConsentError) {
             task.status = ExchangeStatus.REJECTED;
+          } else if (isNonRetryable) {
+            // Phase 17: Dead Letter Queue (FAILED_PERMANENTLY)
+            task.status = ExchangeStatus.FAILED;
+            this.logger.warn(`Task ${task.exchangeId} failed permanently: ${error.message}`);
           } else {
             task.retryCount++;
-            task.status = task.retryCount >= 3 ? ExchangeStatus.FAILED : ExchangeStatus.DRAFT;
+            if (task.retryCount >= 5) {
+              task.status = ExchangeStatus.FAILED; // DLQ after max retries
+              this.logger.warn(`Task ${task.exchangeId} failed after max retries`);
+            } else {
+              task.status = ExchangeStatus.DRAFT;
+              // Phase 9: Exponential backoff with jitter
+              // 2s, 4s, 8s, 16s... + jitter
+              const backoffMs = Math.pow(2, task.retryCount) * 1000;
+              const jitterMs = Math.random() * 1000;
+              task.nextRetryAt = new Date(Date.now() + backoffMs + jitterMs);
+            }
           }
         }
       }
@@ -152,6 +180,21 @@ export class HieOutboxService {
   // Phase 43: Look up an exchange by ID for status tracking
   getExchangeById(exchangeId: string): ExchangeTask | undefined {
     return this.queue.find(t => t.exchangeId === exchangeId);
+  }
+
+  // Phase 17: Expose Dead Letter Queue to authorized operators
+  getDeadLetterQueue() {
+    return this.queue
+      .filter(t => t.status === ExchangeStatus.FAILED)
+      .map(t => ({
+        exchangeId: t.exchangeId,
+        patientId: t.patientId, // In real world, may want to anonymize or restrict based on role
+        priority: t.priority,
+        purpose: t.purpose,
+        retryCount: t.retryCount,
+        lastAttempt: t.lastAttemptAt,
+        status: t.status,
+      }));
   }
 
   // Phase 64: Exchange Reconciliation
