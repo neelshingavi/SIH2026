@@ -8,6 +8,13 @@ export interface OfflinePatient {
   dob: string;
   village: string;
   mobile: string;
+  weight?: string;
+  hb?: string;
+  bp?: string;
+  oxygen?: string;
+  temperature?: string;
+  previousCheckup?: string;
+  healthStatus?: string;
   isSynced: number; // 0 or 1, since boolean is not a valid IDB key
   createdAt: number;
 }
