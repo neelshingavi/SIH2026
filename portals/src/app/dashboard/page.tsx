@@ -309,6 +309,13 @@ export default function MODashboard() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#1e293b', fontWeight: 600 }}>
                         <span>{p.patientName} ({p.age}{p.gender?.[0]})</span>
                       </div>
+                      <div style={{ marginTop: '0.3rem', fontSize: '0.65rem', color: '#64748b', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {p.weight && <span style={{ background: '#f1f5f9', padding: '2px 4px', borderRadius: '4px' }}>W: {p.weight}kg</span>}
+                        {p.hb && <span style={{ background: '#f1f5f9', padding: '2px 4px', borderRadius: '4px' }}>Hb: {p.hb}</span>}
+                        {p.bpVital && <span style={{ background: '#f1f5f9', padding: '2px 4px', borderRadius: '4px' }}>BP: {p.bpVital}</span>}
+                        {p.spo2Vital && <span style={{ background: '#f1f5f9', padding: '2px 4px', borderRadius: '4px' }}>SpO2: {p.spo2Vital}%</span>}
+                        {p.tempVital && <span style={{ background: '#f1f5f9', padding: '2px 4px', borderRadius: '4px' }}>Temp: {p.tempVital}°F</span>}
+                      </div>
                       <button
                         onClick={() => handleReferToExpert(p)}
                         style={{ marginTop: '0.5rem', width: '100%', padding: '0.375rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
