@@ -38,6 +38,18 @@ export class QueueEntry {
   @Column({ default: '' })
   tempVital: string;
 
+  @Column({ default: '' })
+  weight: string;
+
+  @Column({ default: '' })
+  hb: string;
+
+  @Column({ default: '' })
+  previousCheckup: string;
+
+  @Column({ default: '' })
+  healthStatus: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }
