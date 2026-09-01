@@ -110,13 +110,27 @@ export class PatientService {
     // Automatically create a queue entry for PHC triage
     const patientName = dto.fullName || dto.name || 'Unknown Patient';
     const facilityId = user?.facilityId || dto.facilityId || 'PHC-001';
+    
+    // Construct chief complaint. Include ASHA notes if present.
+    let complaint = dto.healthStatus || '';
+    if (!complaint) {
+      complaint = dto.village ? `ASHA Sync (Village: ${dto.village})` : 'Synced from ASHA Field App';
+    }
+
     await this.queueService.createEntry({
       facilityId: facilityId,
       patientName: patientName,
       age: dto.age ? String(dto.age) : '35',
       gender: dto.gender || 'Female',
-      chiefComplaint: dto.village ? `ASHA Sync (Village: ${dto.village})` : 'Synced from ASHA Field App',
+      chiefComplaint: complaint,
       priority: 'NORMAL',
+      weight: dto.weight,
+      hb: dto.hb,
+      bpVital: dto.bp,
+      spo2Vital: dto.oxygen,
+      tempVital: dto.temperature,
+      previousCheckup: dto.previousCheckup,
+      healthStatus: dto.healthStatus,
     });
 
     return {
