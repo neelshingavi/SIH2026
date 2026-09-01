@@ -18,6 +18,7 @@ export class UsersController {
       { username: 'mo_dharampur',   password: 'demo1234', role: Role.MEDICAL_OFFICER, facilityId: 'PHC-001' },
       { username: 'specialist_dh',  password: 'demo1234', role: Role.SPECIALIST,       facilityId: 'DH-001'  },
       { username: 'anm_wagholi',    password: 'demo1234', role: Role.ANM,              facilityId: 'SC-001'  },
+      { username: 'asha_worker',    password: 'demo1234', role: Role.ASHA,             facilityId: 'VILLAGE-01' },
       { username: 'pharmacist_phc', password: 'demo1234', role: Role.FACILITY_ADMIN,   facilityId: 'PHC-001' },
       { username: 'block_admin',    password: 'demo1234', role: Role.DISTRICT_OFFICER, facilityId: 'BLOCK-01' },
     ];

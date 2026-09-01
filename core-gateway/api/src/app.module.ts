@@ -35,12 +35,13 @@ import { AbdmModule } from './abdm/abdm.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RateLimiterMiddleware } from './common/middleware/rate-limiter.middleware.js';
 import { TerminologyService } from './common/terminology/terminology.service.js';
-import { TerminologyModule } from './common/terminology/terminology.module.js';
 import { StructuredLogger } from './common/logger/structured-logger.service.js';
 
 import { QueueEntry } from './queue/entities/queue.entity.js';
 import { DiagnosticOrder } from './diagnostics/entities/diagnostic.entity.js';
 import { ReferralEntry } from './referral/entities/referral-entry.entity.js';
+import { PrescriptionModule } from './prescription/prescription.module.js';
+import { PrescriptionEntry } from './prescription/entities/prescription-entry.entity.js';
 
 @Global()
 @Module({
@@ -58,13 +59,13 @@ export class TerminologyModule {}
       username: process.env.DB_USER || 'hapi',
       password: process.env.DB_PASSWORD || 'hapi_password',
       database: process.env.DB_NAME || 'hapi',
-      entities: [StockItem, StockMovement, FhirResource, SyncIdempotency, User, AuditEvent, QueueEntry, DiagnosticOrder, ReferralEntry],
+      entities: [StockItem, StockMovement, FhirResource, SyncIdempotency, User, AuditEvent, QueueEntry, DiagnosticOrder, ReferralEntry, PrescriptionEntry],
       autoLoadEntities: true,
-      synchronize: true, // Use only in development
+      synchronize: process.env.NODE_ENV !== 'production', // Disabled in production
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,
     UsersModule, AuthModule, AuditModule, FhirModule, CareGapModule, CarePathwayModule, AlertModule,
-    ConsentModule, HieModule, AbdmModule, HealthModule, TerminologyModule
+    ConsentModule, HieModule, AbdmModule, HealthModule, TerminologyModule, PrescriptionModule
   ],
   controllers: [AppController],
   providers: [AppService, StructuredLogger],

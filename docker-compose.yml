@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: hapi
+      POSTGRES_PASSWORD: hapi_password
+      POSTGRES_DB: hapi
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  core-gateway:
+    build: 
+      context: ./core-gateway/api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=hapi
+      - DB_PASSWORD=hapi_password
+      - DB_NAME=hapi
+      - NODE_ENV=development
+    depends_on:
+      - db
+
+  portals:
+    build:
+      context: ./portals
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://192.168.1.14:3001
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://192.168.1.14:3001
+    depends_on:
+      - core-gateway
+
+volumes:
+  pgdata:

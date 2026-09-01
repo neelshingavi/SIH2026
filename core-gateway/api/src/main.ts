@@ -12,7 +12,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
-  app.useLogger(app.get(StructuredLogger));
+  app.useLogger(logger);
   
   // Phase 97: Graceful Shutdown
   app.enableShutdownHooks();
@@ -23,7 +23,7 @@ async function bootstrap() {
   app.enableCors();
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`Core Gateway running on port ${port}`);
 }
 bootstrap();

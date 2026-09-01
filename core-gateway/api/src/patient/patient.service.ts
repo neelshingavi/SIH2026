@@ -63,6 +63,51 @@ export class PatientService {
       result: 'SUCCESS',
     });
 
-    return this.fhirService.getPatientEverything(patientId);
+    // Return mocked data instead of HAPI FHIR
+    return {
+      patient: {
+        id: patientId,
+        name: 'Arjun Kamble',
+        age: '58',
+        gender: 'Male',
+        bloodGroup: 'O+',
+        abhaId: '91-1234-5678-9012'
+      },
+      encounters: [
+        { date: '2026-08-15', facility: 'PHC Dharampur', diagnosis: 'Hypertension', doctor: 'Dr. Neha Desai' },
+        { date: '2026-07-10', facility: 'SC Wagholi', diagnosis: 'Routine Checkup', doctor: 'ANM Anita' }
+      ],
+      allergies: ['Penicillin'],
+      chronicConditions: ['Type 2 Diabetes', 'Hypertension']
+    };
+  }
+
+  async registerPatient(dto: any, user: any, requestId: string) {
+    this.logger.log(`[${requestId}] Registering new patient: ${dto.name}`);
+    
+    // In a real system, we would map the DTO to a FHIR Patient resource and POST to FhirService.
+    const newPatient = {
+      id: `pat-${Date.now()}`,
+      ...dto,
+      registeredBy: user.userId,
+      facilityId: user.facilityId,
+      registrationDate: new Date().toISOString()
+    };
+
+    await this.auditService.logEvent({
+      userId: user.userId,
+      role: user.role,
+      facilityId: user.facilityId,
+      action: 'PATIENT_REGISTERED',
+      resourceType: 'Patient',
+      resourceId: newPatient.id,
+      requestId: requestId,
+      result: 'SUCCESS',
+    });
+
+    return {
+      message: 'Patient registered successfully',
+      patient: newPatient
+    };
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY, Role } from './roles.decorator.js';
+import { ROLES_KEY } from './roles.decorator.js';
+import { Role } from '../users/entities/user.entity.js';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -17,13 +18,13 @@ export class RolesGuard implements CanActivate {
     }
     
     const request = context.switchToHttp().getRequest();
-    const user = request.user; // Assuming user is injected by an AuthGuard
+    const user = request.user; // Assuming user is injected by JwtAuthGuard
 
-    // If user is not present (e.g. no AuthGuard before this), deny access
-    if (!user || !user.roles) {
+    // If user is not present, deny access
+    if (!user || !user.role) {
       throw new UnauthorizedException('Authentication required');
     }
 
-    return requiredRoles.some((role) => user.roles?.includes(role));
+    return requiredRoles.includes(user.role);
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Shell from '@/components/Shell';
+import { apiGet, apiPost } from '@/lib/api';
 
 const s = {
   card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' } as React.CSSProperties,
@@ -86,9 +87,8 @@ export default function MODashboard() {
   useEffect(() => {
     const fetchQ = async () => {
       try {
-        const res = await fetch(`${API}/teleconsult/queue?hubFacilityId=${FACILITY}`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await apiGet(`/teleconsult/queue?hubFacilityId=${FACILITY}`);
+        if (Array.isArray(data)) {
           setTeleconsultQueue(data);
           const active = data.find((q: Teleconsult) => q.status === 'ACTIVE');
           if (active) setActiveCall(active);
@@ -102,12 +102,10 @@ export default function MODashboard() {
 
   const loadOrders = async () => {
     try {
-      const res = await fetch(`${API}/diagnostics/orders`);
-      const data = await res.json();
+      const data = await apiGet(`/diagnostics/orders`);
       setDiagOrders(Array.isArray(data) ? data : []);
       
-      const stockRes = await fetch(`${API}/stock?facilityId=${FACILITY}`);
-      const stock = await stockRes.json();
+      const stock = await apiGet(`/stock?facilityId=${FACILITY}`);
       if(Array.isArray(stock) && stock.length > 0) {
         setLowestStock(stock[0]);
       }
@@ -128,25 +126,25 @@ export default function MODashboard() {
     if (e.key === 'Enter' && emrSearch.trim() !== '') {
       setEmrLoading(true);
       try {
-        const res = await fetch(`${API}/abdm-mock/care-context/${emrSearch}`);
-        const bundle = await res.json();
+        const bundle = await apiGet(`/patient/${emrSearch}/history`);
         
-        // Parse mock bundle
-        const patientEntry = bundle.entry.find((e: any) => e.resource.resourceType === 'Composition');
-        const encounters = bundle.entry.filter((e: any) => e.resource.resourceType === 'Encounter');
+        if (bundle?.patient) {
+          setEmrPatient({
+            abha: bundle.patient.abhaId,
+            name: bundle.patient.name,
+            age: bundle.patient.age,
+            gender: bundle.patient.gender,
+            bloodGroup: bundle.patient.bloodGroup
+          });
+        }
         
-        setEmrPatient({
-          abha: emrSearch,
-          name: patientEntry?.resource?.subject?.display?.replace('Patient with ABHA ', '') || 'Unknown Patient',
-        });
-        
-        const history = encounters.map((enc: any) => {
-          const date = new Date(enc.resource.period.start).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-          const reason = enc.resource.reasonCode?.[0]?.coding?.[0]?.display || 'Visit';
-          return { date, note: reason };
-        });
-        
-        setEmrHistory(history);
+        if (bundle?.encounters) {
+          const history = bundle.encounters.map((enc: any) => ({
+            date: new Date(enc.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+            note: enc.diagnosis
+          }));
+          setEmrHistory(history);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -157,11 +155,7 @@ export default function MODashboard() {
 
   const handleMockLabResult = async (orderId: string) => {
     try {
-      await fetch(`${API}/diagnostics/${orderId}/result`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resultValue: 12.5, resultUnit: 'g/dL' })
-      });
+      await apiPost(`/diagnostics/${orderId}/result`, { resultValue: 12.5, resultUnit: 'g/dL' });
       loadOrders();
     } catch(e) {}
   };
@@ -169,28 +163,40 @@ export default function MODashboard() {
   const handleOrderSubmit = async () => {
     if(!orderForm.patientName) return;
     try {
-      await fetch(`${API}/diagnostics/order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientId: `PAT-${Math.floor(Math.random()*1000)}`,
-          patientName: orderForm.patientName,
-          testCode: '1234-5',
-          testName: orderForm.testName
-        })
+      await apiPost(`/diagnostics/order`, {
+        patientId: `PAT-${Math.floor(Math.random()*1000)}`,
+        patientName: orderForm.patientName,
+        testCode: '1234-5',
+        testName: orderForm.testName
       });
       setShowOrderModal(false);
       loadOrders();
     } catch(e) {}
   };
 
-  const handleSendRx = () => {
-    setRxSent(true);
-    setTimeout(() => {
-      setPrescriptions([]);
-      setAdvice('');
-      setRxSent(false);
-    }, 2000);
+  const handleSendRx = async () => {
+    try {
+      for (const rx of prescriptions) {
+        await apiPost(`/prescriptions`, {
+          facilityId: FACILITY,
+          patientId: emrPatient?.abha || 'PAT-123',
+          patientName: emrPatient?.name || 'Unknown Patient',
+          medicineName: rx.name,
+          dose: rx.dose,
+          frequency: rx.freq,
+          duration: rx.duration,
+          advice: advice
+        });
+      }
+      setRxSent(true);
+      setTimeout(() => {
+        setPrescriptions([]);
+        setAdvice('');
+        setRxSent(false);
+      }, 2000);
+    } catch (e) {
+      console.error('Failed to send prescription', e);
+    }
   };
 
   return (
@@ -247,27 +253,53 @@ export default function MODashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr 320px', gap: '1rem', flex: 1, minHeight: 0 }}>
 
           {/* LEFT: Queue */}
-          <div style={{ ...s.card, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #f1f5f9', fontWeight: 600, color: '#1e293b', fontSize: '0.875rem', flexShrink: 0 }}>
-              Live Teleconsult Queue
-            </div>
-            <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-              <div style={{ flex: 1, padding: '0.5rem 1rem', fontSize: '0.7rem', fontWeight: 600, color: '#0ea5e9', borderBottom: '2px solid #0ea5e9', textAlign: 'center' }}>QUEUE ({activeQueue.length})</div>
-              <div style={{ flex: 1, padding: '0.5rem 1rem', fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', textAlign: 'center' }}>DONE ({completedQueue.length})</div>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {activeQueue.map(q => {
-                const waitMins = Math.floor((Date.now() - new Date(q.createdAt).getTime()) / 60000);
-                return (
-                  <div key={q.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: q.status === 'ACTIVE' ? '#f0fdf4' : 'white' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f766e', marginBottom: '0.2rem' }}>📍 {q.spokeFacilityId}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
-                      <span style={{ fontWeight: 600, color: '#1e293b' }}>{q.patientName}</span>
-                      <span style={{ color: q.status === 'ACTIVE' ? '#10b981' : '#f59e0b', fontWeight: 600 }}>{q.status === 'ACTIVE' ? 'Live' : `Wait: ${waitMins}m`}</span>
-                    </div>
+          {/* LEFT: Queues */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0 }}>
+            
+            {/* ASHA Triage Queue */}
+            <div style={{ ...s.card, display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid #f1f5f9', fontWeight: 600, color: '#1e293b', fontSize: '0.8rem', flexShrink: 0, display: 'flex', justifyContent: 'space-between' }}>
+                ASHA Synced Patients
+                <span style={{ background: '#ecfdf5', color: '#10b981', padding: '0.125rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem' }}>Live Sync</span>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: '#eff6ff' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.2rem' }}>Registered 2 mins ago</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>Sunita Sharma (45F)</span>
                   </div>
-                );
-              })}
+                  <button onClick={() => {
+                    alert('Initiating Teleconsultation with Expert for Sunita Sharma...');
+                  }} style={{ marginTop: '0.5rem', width: '100%', padding: '0.375rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}>
+                    Refer to Expert 📹
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Teleconsult Queue */}
+            <div style={{ ...s.card, display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div style={{ padding: '0.625rem 1rem', borderBottom: '1px solid #f1f5f9', fontWeight: 600, color: '#1e293b', fontSize: '0.8rem', flexShrink: 0 }}>
+                Live Teleconsult Queue
+              </div>
+              <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+                <div style={{ flex: 1, padding: '0.375rem', fontSize: '0.65rem', fontWeight: 600, color: '#0ea5e9', borderBottom: '2px solid #0ea5e9', textAlign: 'center' }}>QUEUE ({activeQueue.length})</div>
+                <div style={{ flex: 1, padding: '0.375rem', fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8', textAlign: 'center' }}>DONE ({completedQueue.length})</div>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {activeQueue.map(q => {
+                  const waitMins = Math.floor((Date.now() - new Date(q.createdAt).getTime()) / 60000);
+                  return (
+                    <div key={q.id} style={{ padding: '0.625rem 1rem', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: q.status === 'ACTIVE' ? '#f0fdf4' : 'white' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f766e', marginBottom: '0.2rem' }}>📍 {q.spokeFacilityId}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                        <span style={{ fontWeight: 600, color: '#1e293b' }}>{q.patientName}</span>
+                        <span style={{ color: q.status === 'ACTIVE' ? '#10b981' : '#f59e0b', fontWeight: 600 }}>{q.status === 'ACTIVE' ? 'Live' : `Wait: ${waitMins}m`}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

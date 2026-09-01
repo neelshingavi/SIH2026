@@ -3,7 +3,7 @@
  * Handles JWT login, token storage, and authenticated fetch for all dashboards.
  */
 
-export const API_BASE = 'http://localhost:3001';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // ── Token storage (sessionStorage so it clears on tab close) ────────────────
 const TOKEN_KEY = 'setu_access_token';

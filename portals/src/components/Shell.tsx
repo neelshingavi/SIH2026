@@ -3,12 +3,9 @@ import React from 'react';
 import { usePathname } from 'next/navigation';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'MO Dashboard', icon: '🏠' },
-  { href: '/block-dashboard', label: 'Block Command', icon: '🏛️' },
-  { href: '/anm-app', label: 'ANM Field App', icon: '👩‍⚕️' },
-  { href: '/queue', label: 'OPD Queue', icon: '👥' },
-  { href: '/teleconsult', label: 'Teleconsultation', icon: '📹' },
-  { href: '/referrals', label: 'Referrals', icon: '🔄' },
+  { href: '/dashboard', label: 'PHC Triage Dashboard', icon: '🏠' },
+  { href: '/teleconsult', label: 'Specialist Teleconsult', icon: '📹' },
+  { href: '/asha-app', label: 'ASHA Mobile App', icon: '👩‍⚕️' },
 ];
 
 export default function Shell({ children, title, subtitle, user = 'Dr. Anjali Patil', role = 'Medical Officer', facility = 'PHC Kondhwa (PHC-27201)', district = 'Block: Haveli | District: Pune' }: {

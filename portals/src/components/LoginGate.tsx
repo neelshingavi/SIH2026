@@ -13,11 +13,9 @@ export const useAuth = () => useContext(AuthContext);
 
 // ── Demo user credentials for quick role switching ────────────────────────────
 const DEMO_USERS = [
-  { label: '🩺 Medical Officer',     username: 'mo_dharampur',   desc: 'PHC Dharampur' },
-  { label: '🔬 Specialist (DH)',      username: 'specialist_dh',  desc: 'District Hospital' },
-  { label: '👩‍⚕️ ANM / ASHA Worker', username: 'anm_wagholi',    desc: 'Sub-Centre Wagholi' },
-  { label: '💊 Pharmacist',           username: 'pharmacist_phc', desc: 'PHC-001 Pharmacy' },
-  { label: '📊 Block Admin',          username: 'block_admin',    desc: 'Pune Block, MH' },
+  { label: '🩺 Medical Officer (PHC)', username: 'mo_dharampur',   desc: 'PHC Triage & Teleconsult Hub' },
+  { label: '🔬 Specialist / Expert',   username: 'specialist_dh',  desc: 'District Hospital Specialist' },
+  { label: '👩‍⚕️ ASHA Worker',          username: 'asha_worker',    desc: 'Offline Mobile Field App' },
 ];
 
 // ── Login Screen ─────────────────────────────────────────────────────────────
@@ -93,7 +91,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
         {/* Quick-Login Demo Cards */}
         <div style={{ marginTop: '1.5rem' }}>
           <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', textAlign: 'center', marginBottom: '0.75rem' }}>Quick Login — Demo Roles</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.625rem' }}>
             {DEMO_USERS.map(d => (
               <button
                 key={d.username}

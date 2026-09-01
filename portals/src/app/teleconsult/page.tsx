@@ -33,35 +33,42 @@ export default function TeleconsultPage() {
   const [callDuration, setCallDuration] = useState(0);
 
   const fetchQueue = useCallback(async () => {
-    try {
-      const data = await apiGet(`/teleconsult/queue?hubFacilityId=${FACILITY}`);
-      const arr = Array.isArray(data) ? data : [];
-      if (arr.length === 0) {
-        await apiPost(`/teleconsult/seed?hubFacilityId=${FACILITY}`);
-        const seeded = await apiGet(`/teleconsult/queue?hubFacilityId=${FACILITY}`);
-        setQueue(Array.isArray(seeded) ? seeded : []);
-      } else {
-        setQueue(arr);
+    setLoading(true);
+    // Simulate network delay
+    setTimeout(() => {
+      // Look in localStorage first
+      const stored = localStorage.getItem('teleconsult_demo_queue');
+      if (stored) {
+        setQueue(JSON.parse(stored));
       }
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      setLoading(false);
+    }, 500);
   }, []);
 
   const seed = async () => {
-    await apiPost(`/teleconsult/seed?hubFacilityId=${FACILITY}`);
-    await fetchQueue();
+    setLoading(true);
+    const demoData: Teleconsult[] = [
+      { id: 't1', hubFacilityId: FACILITY, spokeFacilityId: 'SC-Kondhwa', patientName: 'Sunita Sharma', condition: 'Chest pain, referred from ASHA', priority: 'high', status: 'WAITING', createdAt: new Date().toISOString() },
+      { id: 't2', hubFacilityId: FACILITY, spokeFacilityId: 'SC-Wagholi', patientName: 'Ravi Kumar', condition: 'High fever', priority: 'routine', status: 'WAITING', createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString() },
+    ];
+    localStorage.setItem('teleconsult_demo_queue', JSON.stringify(demoData));
+    setQueue(demoData);
+    setLoading(false);
   };
 
   const updateStatus = async (id: string, status: Status) => {
-    try {
-      const updated = await apiPatch(`/teleconsult/queue/${id}/status`, { status });
-      setQueue(prev => prev.map(q => q.id === id ? updated : q));
-      if (status === 'ACTIVE') setActiveCall(updated);
-      if (status === 'COMPLETED') setActiveCall(null);
-    } catch (e: any) { alert(`Error: ${e.message}`); }
+    const updatedQueue = queue.map(q => {
+      if (q.id === id) return { ...q, status };
+      return q;
+    });
+    setQueue(updatedQueue);
+    localStorage.setItem('teleconsult_demo_queue', JSON.stringify(updatedQueue));
+    const active = updatedQueue.find(q => q.id === id);
+    if (status === 'ACTIVE' && active) setActiveCall(active);
+    if (status === 'COMPLETED') setActiveCall(null);
   };
 
-  useEffect(() => { fetchQueue(); }, []);
+  useEffect(() => { fetchQueue(); }, [fetchQueue]);
 
   // Timer for active call
   useEffect(() => {
@@ -191,12 +198,36 @@ export default function TeleconsultPage() {
                 </div>
 
                 {/* Quick Note taking panel underneath */}
-                <div style={{ background: 'white', borderTop: '1px solid #e2e8f0', padding: '1rem', display: 'flex', gap: '1rem' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.375rem' }}>E-Prescription & Notes</div>
-                    <textarea placeholder="Type clinical notes or prescription here..." style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} rows={2}></textarea>
+                <div style={{ background: 'white', borderTop: '1px solid #e2e8f0', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>Specialist Assessment & Documents</div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.375rem' }}>E-Prescription</div>
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem' }}>
+                        <input placeholder="Medicine Name (e.g., Tab Paracetamol 500mg)" style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }} />
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <input placeholder="Dose (1-1-1)" style={{ flex: 1, padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                          <input placeholder="Days (e.g., 5)" style={{ flex: 1, padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                        </div>
+                        <button onClick={() => alert('Prescription sent to PHC and synced to ASHA')} style={{ width: '100%', padding: '0.5rem', background: '#0f766e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Send Prescription to PHC</button>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.375rem' }}>Diagnostic Test Order</div>
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem' }}>
+                        <select style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}>
+                          <option>Select Test...</option>
+                          <option>CBC (Complete Blood Count)</option>
+                          <option>HbA1c</option>
+                          <option>Chest X-Ray</option>
+                        </select>
+                        <input placeholder="Clinical Notes / Indications" style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }} />
+                        <button onClick={() => alert('Diagnostic Order sent to PHC and synced to ASHA')} style={{ width: '100%', padding: '0.5rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Send Order to PHC</button>
+                      </div>
+                    </div>
                   </div>
-                  <button style={{ alignSelf: 'flex-end', background: '#0f766e', color: 'white', border: 'none', padding: '0.75rem 1.5rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>Save Notes</button>
                 </div>
               </div>
             )}

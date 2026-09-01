@@ -11,6 +11,12 @@ import { Role } from '../users/entities/user.entity.js';
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
 
+  @Post('register')
+  @Roles(Role.ASHA, Role.ANM, Role.MEDICAL_OFFICER)
+  registerPatient(@Body() patientDto: any, @Req() req: any) {
+    return this.patientService.registerPatient(patientDto, req.user, req.correlationId);
+  }
+
   @Post('check-duplicate')
   @Roles(Role.ASHA, Role.ANM, Role.MEDICAL_OFFICER, Role.CHO)
   checkDuplicate(@Body() patientDto: any, @Req() req: any) {
