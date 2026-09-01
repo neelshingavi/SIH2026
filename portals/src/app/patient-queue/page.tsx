@@ -22,21 +22,43 @@ export default function PatientQueueDisplay() {
     const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })), 1000);
     
     // Fetch initial
-    fetch(`${API}/queue?facilityId=${FACILITY}`)
-      .then(res => res.json())
-      .then(setQueue)
-      .catch(console.error);
+    const loadQueue = async () => {
+      try {
+        const res = await fetch(`${API}/queue?facilityId=${FACILITY}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          if (data.length === 0) {
+            // Auto seed if empty for demo
+            await fetch(`${API}/queue/seed?facilityId=${FACILITY}`, { method: 'POST' });
+            const seededRes = await fetch(`${API}/queue?facilityId=${FACILITY}`);
+            if (seededRes.ok) {
+              const seededData = await seededRes.json();
+              if (Array.isArray(seededData)) setQueue(seededData);
+            }
+          } else {
+            setQueue(data);
+          }
+        } else {
+          setQueue([]);
+        }
+      } catch (e) {
+        console.error('Queue fetch error:', e);
+        setQueue([]);
+      }
+    };
+    loadQueue();
 
     // Live Socket
     const socket = io(`${API}/queue`, { transports: ['websocket'] });
     socket.on('connect', () => socket.emit('joinFacility', FACILITY));
     
     socket.on('entryUpdated', (updated: QueueEntry) => {
-      setQueue(prev => prev.map(e => e.id === updated.id ? updated : e));
+      setQueue(prev => Array.isArray(prev) ? prev.map(e => e.id === updated.id ? updated : e) : [updated]);
     });
     
     socket.on('entryAdded', (entry: QueueEntry) => {
-      setQueue(prev => [...prev, entry]);
+      setQueue(prev => Array.isArray(prev) ? [...prev, entry] : [entry]);
     });
 
     return () => {
@@ -45,8 +67,9 @@ export default function PatientQueueDisplay() {
     };
   }, []);
 
-  const currentlyServing = queue.filter(e => e.status === 'CALLED' || e.status === 'IN_CONSULT');
-  const waiting = queue.filter(e => e.status === 'WAITING').slice(0, 10); // show next 10
+  const safeQueue = Array.isArray(queue) ? queue : [];
+  const currentlyServing = safeQueue.filter(e => e.status === 'CALLED' || e.status === 'IN_CONSULT');
+  const waiting = safeQueue.filter(e => e.status === 'WAITING').slice(0, 10); // show next 10
 
   return (
     <div style={{ height: '100vh', width: '100vw', background: '#0f172a', color: 'white', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>

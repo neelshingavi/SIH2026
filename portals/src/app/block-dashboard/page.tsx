@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Shell from '@/components/Shell';
+import { apiGet } from '@/lib/api';
 
 const API = 'http://localhost:3001';
 
@@ -9,16 +10,9 @@ export default function BlockDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/analytics/dashboard`)
-      .then(res => res.json())
-      .then(d => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+    apiGet('/analytics/dashboard')
+      .then(d => { setData(d); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
   }, []);
 
   const s = { card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' } as React.CSSProperties };

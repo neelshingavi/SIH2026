@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import Shell from '@/components/Shell';
+import { apiGet, apiPost, apiPatch, getToken } from '@/lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Priority = 'EMERGENCY' | 'HIGH' | 'NORMAL';
@@ -163,11 +164,18 @@ export default function QueuePage() {
   // ── Fetch initial queue ──────────────────────────────────────────────────
   const fetchQueue = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/queue?facilityId=${FACILITY}`);
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data: QueueEntry[] = await res.json();
-      setQueue(data);
-      if (data.length > 0 && !selected) setSelected(data[0]);
+      const data: QueueEntry[] = await apiGet(`/queue?facilityId=${FACILITY}`);
+      const arr = Array.isArray(data) ? data : [];
+      if (arr.length === 0) {
+        await apiPost(`/queue/seed?facilityId=${FACILITY}`);
+        const seeded: QueueEntry[] = await apiGet(`/queue?facilityId=${FACILITY}`);
+        const s2 = Array.isArray(seeded) ? seeded : [];
+        setQueue(s2);
+        if (s2.length > 0 && !selected) setSelected(s2[0]);
+      } else {
+        setQueue(arr);
+        if (arr.length > 0 && !selected) setSelected(arr[0]);
+      }
     } catch {
       // keep empty state on error
     } finally {
@@ -177,7 +185,7 @@ export default function QueuePage() {
 
   // ── Seed demo data if empty ──────────────────────────────────────────────
   const seed = useCallback(async () => {
-    await fetch(`${API}/queue/seed?facilityId=${FACILITY}`, { method: 'POST' });
+    await apiPost(`/queue/seed?facilityId=${FACILITY}`);
     await fetchQueue();
   }, [fetchQueue]);
 

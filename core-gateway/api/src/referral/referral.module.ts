@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ReferralService } from './referral.service.js';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReferralController } from './referral.controller.js';
-import { QueueModule } from '../queue/queue.module.js';
+import { ReferralEntry } from './entities/referral-entry.entity.js';
 
 @Module({
-  imports: [QueueModule],
+  imports: [TypeOrmModule.forFeature([ReferralEntry])],
   controllers: [ReferralController],
-  providers: [ReferralService],
+  providers: [],
 })
 export class ReferralModule {}

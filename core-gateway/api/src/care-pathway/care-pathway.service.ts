@@ -439,9 +439,9 @@ export class CarePathwayService {
           }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       // Non-fatal: HIE audit gap detection is best-effort
-      this.logger.warn(`HIE audit gap detection failed: ${e.message}`);
+      this.logger.warn(`HIE audit gap detection failed: ${e?.message || e}`);
     }
 
     // Sort by priority (EMERGENCY > HIGH > ROUTINE)

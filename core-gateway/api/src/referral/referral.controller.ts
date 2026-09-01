@@ -1,56 +1,78 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
-import { ReferralService } from './referral.service.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ReferralEntry, ReferralStatus, ReferralPriority } from './entities/referral-entry.entity.js';
+
+const STATUS_ADVANCE: Record<ReferralStatus, ReferralStatus | null> = {
+  CREATED:    'ACCEPTED',
+  ACCEPTED:   'IN_TRANSIT',
+  IN_TRANSIT: 'ARRIVED',
+  ARRIVED:    'COMPLETED',
+  COMPLETED:  null,
+};
+
+const DEMO_REFERRALS = [
+  { fromFacilityId: 'SC-Wagholi',  patientName: 'Sunita Deshpande', age: '28', gender: 'F', reason: 'Pre-eclampsia — BP 160/110, proteinuria',     priority: 'EMERGENCY' as ReferralPriority, status: 'CREATED'   as ReferralStatus },
+  { fromFacilityId: 'SC-Khed',     patientName: 'Lata Patil',        age: '34', gender: 'F', reason: '36-wk ANC — fetal growth restriction',           priority: 'HIGH'      as ReferralPriority, status: 'ACCEPTED'  as ReferralStatus },
+  { fromFacilityId: 'PHC-Bhor',    patientName: 'Arjun Kamble',      age: '58', gender: 'M', reason: 'Acute chest pain, ECG changes',                   priority: 'EMERGENCY' as ReferralPriority, status: 'IN_TRANSIT' as ReferralStatus },
+  { fromFacilityId: 'SC-Wagholi',  patientName: 'Meena Jadhav',      age: '22', gender: 'F', reason: 'Post-partum haemorrhage — EBL 900 mL',            priority: 'EMERGENCY' as ReferralPriority, status: 'ARRIVED'   as ReferralStatus },
+  { fromFacilityId: 'PHC-Daund',   patientName: 'Ramesh Shinde',     age: '45', gender: 'M', reason: 'Diabetic foot ulcer — suspected osteomyelitis',    priority: 'HIGH'      as ReferralPriority, status: 'CREATED'   as ReferralStatus },
+  { fromFacilityId: 'SC-Khed',     patientName: 'Priya More',        age: '30', gender: 'F', reason: 'Eclampsia with seizures',                           priority: 'EMERGENCY' as ReferralPriority, status: 'COMPLETED' as ReferralStatus },
+];
 
 @Controller('referral')
-@UseGuards(JwtAuthGuard)
 export class ReferralController {
-  constructor(private readonly referralService: ReferralService) {}
+  constructor(
+    @InjectRepository(ReferralEntry)
+    private readonly repo: Repository<ReferralEntry>,
+  ) {}
 
+  /** GET /referral?facilityId=PHC-001 — list all referrals for a facility */
   @Get()
-  async getReferrals(
-    @Query('direction') direction: 'incoming' | 'outgoing',
-    @Query('status') status: string,
-    @Query('priority') priority: string,
-    @Query('patientId') patientId: string,
-    @Req() req: any
-  ) {
-    const isIncoming = direction === 'incoming';
-    const filters = { status, priority, patientId };
-    const tasks = await this.referralService.searchReferrals(req.user.facilityId, req.user.role, isIncoming, filters);
-    
-    // SLA Engine: Dynamically attach SLA status
-    return tasks.map((task: any) => {
-      let slaStatus = 'ON_TRACK';
-      if (task.authoredOn) {
-        const hoursSince = (new Date().getTime() - new Date(task.authoredOn).getTime()) / (1000 * 60 * 60);
-        // If it's a stat/emergency priority, SLA is much tighter (1 hour limit)
-        const limit = task.priority === 'stat' ? 1 : task.priority === 'urgent' ? 24 : 72;
-        if (hoursSince > limit) slaStatus = 'BREACHED';
-        else if (hoursSince > limit * 0.75) slaStatus = 'WARNING';
-      }
-      return { ...task, slaStatus };
+  async getReferrals(@Query('facilityId') facilityId: string) {
+    const list = await this.repo.find({
+      where: { facilityId: facilityId || 'PHC-001' },
+      order: { createdAt: 'DESC' },
     });
+    return list;
   }
 
-  @Get('destinations')
-  getDestinations(@Query('service') serviceType: string) {
-    return this.referralService.getDestinations(serviceType);
+  /** POST /referral — create a new referral */
+  @Post()
+  async createReferral(@Body() body: Partial<ReferralEntry>) {
+    const entry = this.repo.create({
+      facilityId:     body.facilityId     || 'PHC-001',
+      fromFacilityId: body.fromFacilityId || 'SC-001',
+      patientName:    body.patientName    || 'Unknown Patient',
+      age:            body.age            || '',
+      gender:         body.gender         || 'F',
+      reason:         body.reason         || '',
+      notes:          body.notes          || '',
+      priority:       body.priority       || 'NORMAL',
+      status:         'CREATED',
+    });
+    return this.repo.save(entry);
   }
 
-  @Patch(':id/status')
-  updateStatus(
-    @Param('id') id: string, 
-    @Body('status') status: string,
-    @Req() req: any
-  ) {
-    return this.referralService.updateStatus(id, status, req.user, req.correlationId);
+  /** PATCH /referral/:id/advance — advance to next status */
+  @Patch(':id/advance')
+  async advance(@Param('id') id: string) {
+    const entry = await this.repo.findOneBy({ id });
+    if (!entry) return { error: 'Not found' };
+    const next = STATUS_ADVANCE[entry.status];
+    if (!next) return entry; // already COMPLETED
+    entry.status = next;
+    return this.repo.save(entry);
   }
 
-  @Get(':id/packet')
-  getReferralPacket(@Param('id') id: string) {
-    return this.referralService.getReferralPacket(id);
+  /** POST /referral/seed?facilityId=PHC-001 — seed demo data */
+  @Post('seed')
+  async seed(@Query('facilityId') facilityId: string) {
+    const fid = facilityId || 'PHC-001';
+    const existing = await this.repo.count({ where: { facilityId: fid } });
+    if (existing > 0) return { message: 'Already seeded', count: existing };
+    const entries = DEMO_REFERRALS.map(r => this.repo.create({ ...r, facilityId: fid }));
+    await this.repo.save(entries);
+    return { message: 'Seeded', count: entries.length };
   }
 }
-
-

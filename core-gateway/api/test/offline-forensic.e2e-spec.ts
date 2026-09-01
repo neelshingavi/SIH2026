@@ -10,9 +10,10 @@ import { vi } from 'vitest';
 describe('Offline Forensic Sync (e2e)', () => {
   let app: INestApplication;
   let jwtToken: string;
+  let mockFhirService: any;
 
   beforeAll(async () => {
-    const mockFhirService = {
+    mockFhirService = {
       saveResource: vi.fn().mockResolvedValue(true),
       searchResource: vi.fn().mockResolvedValue([]),
       createOrUpdate: vi.fn().mockResolvedValue(true),

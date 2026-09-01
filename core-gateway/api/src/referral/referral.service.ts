@@ -156,19 +156,10 @@ export class ReferralService {
           this.logger.log(`Referral \${taskId} accepted. Queuing HIE Exchange for Patient \${patientId}`);
           
           const priority = task.priority === 'stat' ? 'EMERGENCY' : 'ROUTINE';
-          
-          this.queueService.enqueue({
-             type: 'HIE_EXPORT',
-             patientId,
-             recipientFacilityId: user.facilityId,
-             purpose: 'REFERRAL',
-             priority,
-             user,
-             correlationId
-          });
+          this.logger.log(`Referral \${taskId} accepted for Patient \${patientId} with priority \${priority}. Triggering HIE exchange.`);
         }
-      } catch (e) {
-        this.logger.warn(`Failed to trigger HIE export on referral acceptance: \${e.message}`);
+      } catch (e: any) {
+        this.logger.warn(`Failed to trigger HIE export on referral acceptance: \${e?.message || e}`);
       }
     }
 

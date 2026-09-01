@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import LoginGate from "@/components/LoginGate";
 
 export const metadata: Metadata = {
   title: "SwasthyaSetu - Enterprise Platform",
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body style={{ margin: 0, padding: 0, background: '#f4f7f9' }}>
-        {children}
+        <LoginGate>
+          {children}
+        </LoginGate>
       </body>
     </html>
   );

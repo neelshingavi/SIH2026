@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Shell from '@/components/Shell';
+import { apiGet, apiPost } from '@/lib/api';
 
 const s = {
   card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' } as React.CSSProperties,
@@ -24,10 +25,19 @@ export default function PharmacyDashboard() {
 
   const fetchStock = async () => {
     try {
-      const res = await fetch(`${API}/stock?facilityId=${FACILITY}`);
-      setStock(await res.json());
+      const data = await apiGet(`/stock?facilityId=${FACILITY}`);
+      const arr = Array.isArray(data) ? data : [];
+      if (arr.length === 0) {
+        // Auto-seed empty pharmacy
+        await apiPost(`/stock/seed?facilityId=${FACILITY}`);
+        const seeded = await apiGet(`/stock?facilityId=${FACILITY}`);
+        setStock(Array.isArray(seeded) ? seeded : []);
+      } else {
+        setStock(arr);
+      }
     } catch (e) {
       console.error('Failed to fetch stock', e);
+      setStock([]);
     }
   };
 
@@ -39,24 +49,19 @@ export default function PharmacyDashboard() {
 
   const handleSeed = async () => {
     setIsSeeding(true);
-    await fetch(`${API}/stock/seed?facilityId=${FACILITY}`, { method: 'POST' });
+    await apiPost(`/stock/seed?facilityId=${FACILITY}`);
     await fetchStock();
     setIsSeeding(false);
   };
 
   const handleDispense = async () => {
     if (!dispenseForm.drugName || dispenseForm.quantity < 1) return;
-    
     try {
-      await fetch(`${API}/stock/movement`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          facilityId: FACILITY,
-          drugName: dispenseForm.drugName,
-          type: 'DISPENSED',
-          quantity: dispenseForm.quantity
-        })
+      await apiPost('/stock/movement', {
+        facilityId: FACILITY,
+        drugName: dispenseForm.drugName,
+        type: 'DISPENSED',
+        quantity: dispenseForm.quantity
       });
       setShowDispense(false);
       fetchStock();

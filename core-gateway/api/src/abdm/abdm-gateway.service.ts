@@ -29,8 +29,18 @@ export class AbdmGatewayService implements HealthExchangeAdapter {
   }
 
   async linkCareContext(patientId: string, facilityId: string, consentArtifactId: string): Promise<boolean> {
-    this.logger.log(`[ABDM_SIM] Linking care context for \${patientId} to \${facilityId} with consent \${consentArtifactId}`);
+    this.logger.log(`[ABDM_SIM] Linking care context for ${patientId} to ${facilityId} with consent ${consentArtifactId}`);
     return true;
+  }
+
+  async verifyAbha(abhaNumber: string) {
+    this.logger.log(`[ABDM ${this.mode}] Verifying ABHA: ${abhaNumber}`);
+    return {
+      status: 'VERIFIED',
+      abhaNumber,
+      name: 'Simulated Patient',
+      verifiedAt: new Date().toISOString(),
+    };
   }
 
   // Phase 9: HealthExchangeAdapter implementation

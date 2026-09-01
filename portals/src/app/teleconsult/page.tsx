@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import Shell from '@/components/Shell';
+import { apiGet, apiPost, apiPatch } from '@/lib/api';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type Priority = 'high' | 'routine';
@@ -33,30 +34,30 @@ export default function TeleconsultPage() {
 
   const fetchQueue = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/teleconsult/queue?hubFacilityId=${FACILITY}`);
-      if (res.ok) setQueue(await res.json());
+      const data = await apiGet(`/teleconsult/queue?hubFacilityId=${FACILITY}`);
+      const arr = Array.isArray(data) ? data : [];
+      if (arr.length === 0) {
+        await apiPost(`/teleconsult/seed?hubFacilityId=${FACILITY}`);
+        const seeded = await apiGet(`/teleconsult/queue?hubFacilityId=${FACILITY}`);
+        setQueue(Array.isArray(seeded) ? seeded : []);
+      } else {
+        setQueue(arr);
+      }
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
 
   const seed = async () => {
-    await fetch(`${API}/teleconsult/seed?hubFacilityId=${FACILITY}`, { method: 'POST' });
+    await apiPost(`/teleconsult/seed?hubFacilityId=${FACILITY}`);
     await fetchQueue();
   };
 
   const updateStatus = async (id: string, status: Status) => {
     try {
-      const res = await fetch(`${API}/teleconsult/queue/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setQueue(prev => prev.map(q => q.id === id ? updated : q));
-        if (status === 'ACTIVE') setActiveCall(updated);
-        if (status === 'COMPLETED') setActiveCall(null);
-      }
+      const updated = await apiPatch(`/teleconsult/queue/${id}/status`, { status });
+      setQueue(prev => prev.map(q => q.id === id ? updated : q));
+      if (status === 'ACTIVE') setActiveCall(updated);
+      if (status === 'COMPLETED') setActiveCall(null);
     } catch (e: any) { alert(`Error: ${e.message}`); }
   };
 

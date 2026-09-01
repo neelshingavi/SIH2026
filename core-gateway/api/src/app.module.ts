@@ -1,3 +1,5 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 import { Module, MiddlewareConsumer, NestModule, Global, RequestMethod } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
@@ -36,6 +38,10 @@ import { TerminologyService } from './common/terminology/terminology.service.js'
 import { TerminologyModule } from './common/terminology/terminology.module.js';
 import { StructuredLogger } from './common/logger/structured-logger.service.js';
 
+import { QueueEntry } from './queue/entities/queue.entity.js';
+import { DiagnosticOrder } from './diagnostics/entities/diagnostic.entity.js';
+import { ReferralEntry } from './referral/entities/referral-entry.entity.js';
+
 @Global()
 @Module({
   providers: [TerminologyService],
@@ -47,12 +53,13 @@ export class TerminologyModule {}
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: 5432,
-      username: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
+      host: process.env.DB_HOST || '127.0.0.1',
+      port: parseInt(process.env.DB_PORT || '5433', 10),
+      username: process.env.DB_USER || 'hapi',
+      password: process.env.DB_PASSWORD || 'hapi_password',
       database: process.env.DB_NAME || 'hapi',
-      entities: [StockItem, StockMovement, FhirResource, SyncIdempotency, User, AuditEvent],
+      entities: [StockItem, StockMovement, FhirResource, SyncIdempotency, User, AuditEvent, QueueEntry, DiagnosticOrder, ReferralEntry],
+      autoLoadEntities: true,
       synchronize: true, // Use only in development
     }),
     SyncModule, TriageModule, TeleconsultModule, StockModule, DiagnosticsModule, PatientModule, QueueModule, ReferralModule, AnalyticsModule,

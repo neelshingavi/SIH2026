@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { HieService } from './hie.service.js';
 import { AbdmGatewayService } from '../abdm/abdm-gateway.service.js';
 import { ExchangeStatus, ExchangeRequest } from './interfaces/health-exchange-adapter.interface.js';
@@ -29,7 +29,9 @@ export class HieOutboxService {
   private isProcessing = false;
 
   constructor(
+    @Inject(forwardRef(() => HieService))
     private readonly hieService: HieService,
+    @Inject(forwardRef(() => AbdmGatewayService))
     private readonly abdmGateway: AbdmGatewayService
   ) {
     setInterval(() => this.processQueue(), 5000);
@@ -52,13 +54,12 @@ export class HieOutboxService {
       recipientFacilityId,
       purpose,
       priority,
-      status: ExchangeStatus.PENDING as any, // initial queue state
+      status: ExchangeStatus.DRAFT,
       retryCount: 0,
       user,
       correlationId,
       createdAt: new Date(),
     };
-    task.status = ExchangeStatus.DRAFT;
 
     this.queue.push(task);
     this.logger.log(`Queued HIE export \${exchangeId} with priority \${priority}`);

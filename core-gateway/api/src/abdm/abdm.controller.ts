@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards, Req, Post, Body } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Req, Post, Body, Inject, forwardRef } from '@nestjs/common';
 import { AbdmGatewayService } from './abdm-gateway.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
@@ -9,6 +9,7 @@ import { HieOutboxService } from '../hie/hie-outbox.service.js';
 export class AbdmController {
   constructor(
     private readonly abdmGateway: AbdmGatewayService,
+    @Inject(forwardRef(() => HieOutboxService))
     private readonly outboxService: HieOutboxService
   ) {}
 

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import Shell from '@/components/Shell';
+import { apiGet, apiPost, apiPatch } from '@/lib/api';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type Status   = 'CREATED' | 'ACCEPTED' | 'IN_TRANSIT' | 'ARRIVED' | 'COMPLETED';
@@ -60,13 +61,8 @@ function SendReferralModal({ onClose, onSent }: { onClose: () => void; onSent: (
     if (!form.patientName.trim() || !form.reason.trim()) { setError('Patient name and reason are required'); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/referral`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, toFacilityId: FACILITY }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      onSent(await res.json());
+      const data = await apiPost('/referral', { ...form, toFacilityId: FACILITY });
+      onSent(data);
       onClose();
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
@@ -145,26 +141,32 @@ export default function ReferralsPage() {
 
   const fetchReferrals = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/referral?facilityId=${FACILITY}`);
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data: Referral[] = await res.json();
-      setReferrals(data);
-      if (data.length > 0 && !selected) setSelected(data[0]);
+      const data: Referral[] = await apiGet(`/referral?facilityId=${FACILITY}`);
+      const arr = Array.isArray(data) ? data : [];
+      if (arr.length === 0) {
+        // Auto-seed if empty
+        await apiPost(`/referral/seed?facilityId=${FACILITY}`);
+        const seeded: Referral[] = await apiGet(`/referral?facilityId=${FACILITY}`);
+        const s2 = Array.isArray(seeded) ? seeded : [];
+        setReferrals(s2);
+        if (s2.length > 0 && !selected) setSelected(s2[0]);
+      } else {
+        setReferrals(arr);
+        if (arr.length > 0 && !selected) setSelected(arr[0]);
+      }
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [selected]);
 
   const seed = async () => {
-    await fetch(`${API}/referral/seed?facilityId=${FACILITY}`, { method: 'POST' });
+    await apiPost(`/referral/seed?facilityId=${FACILITY}`);
     await fetchReferrals();
   };
 
   const advance = async (id: string) => {
     setAdvancing(id);
     try {
-      const res = await fetch(`${API}/referral/${id}/advance`, { method: 'PATCH' });
-      if (!res.ok) throw new Error(await res.text());
-      const updated: Referral = await res.json();
+      const updated: Referral = await apiPatch(`/referral/${id}/advance`);
       setReferrals(prev => prev.map(r => r.id === updated.id ? updated : r));
       setSelected(sel => sel?.id === updated.id ? updated : sel);
     } catch (e: any) { alert(`Error: ${e.message}`); }

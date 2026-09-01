@@ -21,7 +21,7 @@ async function bootstrap() {
 
   for (const res of oldResources) {
     try {
-      let payload = res.jsonPayload;
+      let payload: any = res.jsonPayload;
       if (typeof payload === 'string') {
         payload = JSON.parse(payload);
       }
