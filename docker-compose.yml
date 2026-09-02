@@ -20,6 +20,8 @@ services:
       - spring.datasource.url=jdbc:postgresql://db:5432/hapi
       - spring.datasource.username=hapi
       - spring.datasource.password=hapi_password
+      - spring.datasource.driverClassName=org.postgresql.Driver
+      - spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
     depends_on:
       - db
 
