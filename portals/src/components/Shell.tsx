@@ -127,7 +127,9 @@ export default function Shell({ children, title, subtitle, user = 'Dr. Anjali Pa
             </div>
 
             {/* Date */}
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>📅 25 May 2025</div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+              📅 {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
 
             {/* Bell */}
             <div style={{ position: 'relative', cursor: 'pointer', color: '#cbd5e1' }}>
