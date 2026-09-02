@@ -94,7 +94,7 @@ export default function MODashboard() {
       } catch (e) { /* silent */ }
     };
     fetchQ();
-    const interval = setInterval(fetchQ, 5000);
+    const interval = setInterval(fetchQ, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -108,7 +108,7 @@ export default function MODashboard() {
       } catch (e) { /* silent */ }
     };
     fetchAsha();
-    const interval = setInterval(fetchAsha, 3000);
+    const interval = setInterval(fetchAsha, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -133,6 +133,26 @@ export default function MODashboard() {
       console.error(e);
     }
   };
+
+  // Hidden Reset Hotkey
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        try {
+          await apiPost('/queue/reset', {});
+          localStorage.removeItem('teleconsult_demo_queue');
+          setAshaQueue([]);
+          setTeleconsultQueue([]);
+          alert('System Hard Reset Successful!');
+        } catch (err) {
+          alert('Reset failed');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const loadOrders = async () => {
     try {
@@ -302,7 +322,12 @@ export default function MODashboard() {
                   </div>
                 ) : (
                   ashaQueue.map(p => (
-                    <div key={p.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', background: '#eff6ff' }}>
+                    <div key={p.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', background: '#eff6ff', position: 'relative' }}>
+                      {p.priority === 'EMERGENCY' && (
+                        <div style={{ position: 'absolute', top: '0.5rem', right: '1rem', background: '#ef4444', color: 'white', padding: '0.125rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 700, animation: 'pulse 1.5s infinite' }}>
+                          EMERGENCY
+                        </div>
+                      )}
                       <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.2rem' }}>
                         📍 {p.chiefComplaint || 'Synced from ASHA'}
                       </div>
@@ -646,6 +671,11 @@ export default function MODashboard() {
                       0% { top: 0; }
                       50% { top: 100%; }
                       100% { top: 0; }
+                    }
+                    @keyframes pulse {
+                      0% { opacity: 1; transform: scale(1); }
+                      50% { opacity: 0.8; transform: scale(1.05); }
+                      100% { opacity: 1; transform: scale(1); }
                     }
                   `}} />
                 </div>

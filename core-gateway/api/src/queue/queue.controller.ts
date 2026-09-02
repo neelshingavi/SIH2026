@@ -35,9 +35,14 @@ export class QueueController {
     return this.queueService.advanceStatus(id);
   }
 
-  /** POST /queue/seed?facilityId=PHC-001 — seed demo data */
   @Post('seed')
   seed(@Query('facilityId') facilityId: string) {
     return this.queueService.seedFacility(facilityId);
+  }
+
+  /** POST /queue/reset — hard reset the queue for demo purposes */
+  @Post('reset')
+  reset() {
+    return this.queueService.resetQueue();
   }
 }

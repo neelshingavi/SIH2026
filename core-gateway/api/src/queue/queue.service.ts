@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QueueEntry } from './entities/queue.entity.js';
+import { FhirService } from '../fhir/fhir.service.js';
 
 const VALID_TRANSITIONS: Record<string, string> = {
   WAITING: 'CALLED',
@@ -16,6 +17,7 @@ export class QueueService {
   constructor(
     @InjectRepository(QueueEntry)
     private readonly queueRepo: Repository<QueueEntry>,
+    private readonly fhirService: FhirService,
   ) {}
 
   async createEntry(dto: {
@@ -48,7 +50,35 @@ export class QueueService {
       previousCheckup: dto.previousCheckup ?? '',
       healthStatus: dto.healthStatus ?? '',
     });
-    return this.queueRepo.save(entry);
+    const saved = await this.queueRepo.save(entry);
+
+    // Create FHIR Task with SLA
+    try {
+      const slaMinutes = dto.priority === 'EMERGENCY' ? 15 : dto.priority === 'HIGH' ? 30 : 120;
+      const slaEnd = new Date(Date.now() + slaMinutes * 60000).toISOString();
+
+      const task = {
+        resourceType: 'Task',
+        id: `task-\${saved.id}`,
+        status: 'requested',
+        intent: 'order',
+        priority: dto.priority === 'EMERGENCY' ? 'stat' : dto.priority === 'HIGH' ? 'urgent' : 'routine',
+        description: `Patient Referral / Triage: \${dto.chiefComplaint}`,
+        restriction: {
+          period: {
+            end: slaEnd
+          }
+        },
+        for: {
+          display: dto.patientName
+        }
+      };
+      await this.fhirService.createOrUpdate('Task', task.id, task, undefined, 'CREATE');
+    } catch (e: any) {
+      this.logger.error('Failed to create FHIR Task', e.stack);
+    }
+
+    return saved;
   }
 
   async advanceStatus(id: string) {
@@ -99,5 +129,10 @@ export class QueueService {
       created.push(await this.createEntry({ facilityId, ...s, spo2Vital: (s as any).spo2Vital ?? '' }));
     }
     return { message: 'Seeded', count: created.length };
+  }
+
+  async resetQueue() {
+    await this.queueRepo.clear();
+    return { message: 'Queue reset successfully' };
   }
 }

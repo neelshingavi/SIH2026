@@ -9,19 +9,19 @@ export default function AshaApp() {
   const [view, setView] = useState<'dashboard' | 'register'>('dashboard');
 
   const [form, setForm] = useState({
-    abhaNumber: '',
-    name: '',
-    age: '',
+    abhaNumber: '14-1234-5678-9012',
+    name: 'Sunita Sharma',
+    age: '28',
     gender: 'Female',
-    phone: '',
-    address: '',
-    weight: '',
-    hb: '',
-    bp: '',
-    oxygen: '',
-    temperature: '',
-    previousCheckup: '',
-    healthStatus: ''
+    phone: '9876543210',
+    address: 'House 42, Kondhwa Village',
+    weight: '62',
+    hb: '11.0',
+    bp: '160/100',
+    oxygen: '94',
+    temperature: '99.1',
+    previousCheckup: 'Routine ANC visit 2 weeks ago was normal.',
+    healthStatus: 'Chest pain, shortness of breath, blurred vision (Pregnancy 8th month).'
   });
 
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');

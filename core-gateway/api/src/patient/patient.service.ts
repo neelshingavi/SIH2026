@@ -65,31 +65,80 @@ export class PatientService {
       result: 'SUCCESS',
     });
 
-    // Return mocked data instead of HAPI FHIR
-    return {
-      patient: {
-        id: patientId,
-        name: 'Arjun Kamble',
-        age: '58',
-        gender: 'Male',
-        bloodGroup: 'O+',
-        abhaId: '91-1234-5678-9012'
-      },
-      encounters: [
-        { date: '2026-08-15', facility: 'PHC Dharampur', diagnosis: 'Hypertension', doctor: 'Dr. Neha Desai' },
-        { date: '2026-07-10', facility: 'SC Wagholi', diagnosis: 'Routine Checkup', doctor: 'ANM Anita' }
-      ],
-      allergies: ['Penicillin'],
-      chronicConditions: ['Type 2 Diabetes', 'Hypertension']
-    };
+    try {
+      // Fetch real FHIR patient data
+      const fhirPatient = await this.fhirService.getResource('Patient', patientId);
+      if (!fhirPatient) {
+        throw new Error('Patient not found');
+      }
+
+      // We can also fetch $everything to get encounters (not fully implemented in prototype UI yet)
+      
+      return {
+        patient: {
+          id: patientId,
+          name: fhirPatient.name?.[0]?.text || 'Unknown',
+          age: fhirPatient.birthDate ? (new Date().getFullYear() - new Date(fhirPatient.birthDate).getFullYear()).toString() : 'Unknown',
+          gender: fhirPatient.gender || 'Unknown',
+          bloodGroup: 'Unknown',
+          abhaId: 'Unknown'
+        },
+        encounters: [],
+        allergies: [],
+        chronicConditions: []
+      };
+    } catch (e: any) {
+      this.logger.error(`Error fetching patient \${patientId} from FHIR`, e.stack);
+      // Fallback for prototype if FHIR is down
+      return {
+        patient: {
+          id: patientId,
+          name: 'Arjun Kamble (Mock)',
+          age: '58',
+          gender: 'Male',
+          bloodGroup: 'O+',
+          abhaId: '91-1234-5678-9012'
+        },
+        encounters: [],
+        allergies: [],
+        chronicConditions: []
+      };
+    }
   }
 
   async registerPatient(dto: any, user: any, requestId: string) {
     this.logger.log(`[${requestId}] Registering new patient: ${dto.name}`);
     
-    // In a real system, we would map the DTO to a FHIR Patient resource and POST to FhirService.
+    // Real FHIR mapping
+    const newPatientId = `pat-${Date.now()}`;
+    const fhirPatient = {
+      resourceType: 'Patient',
+      id: newPatientId,
+      name: [{ text: dto.fullName || dto.name || 'Unknown' }],
+      gender: (dto.gender || 'unknown').toLowerCase(),
+      telecom: dto.phone ? [{ system: 'phone', value: dto.phone }] : undefined,
+      extension: [
+        {
+          url: 'http://sih.gov.in/fhir/StructureDefinition/facility',
+          valueString: user.facilityId || dto.facilityId
+        }
+      ]
+    };
+
+    // Calculate approx birth date if age is provided
+    if (dto.age) {
+      const year = new Date().getFullYear() - parseInt(dto.age, 10);
+      (fhirPatient as any).birthDate = `${year}-01-01`;
+    }
+
+    try {
+      await this.fhirService.createOrUpdate('Patient', newPatientId, fhirPatient, undefined, 'CREATE');
+    } catch (e: any) {
+      this.logger.error('Failed to create FHIR Patient, continuing for queue', e.stack);
+    }
+
     const newPatient = {
-      id: `pat-${Date.now()}`,
+      id: newPatientId,
       ...dto,
       registeredBy: user.userId,
       facilityId: user.facilityId,
@@ -102,7 +151,7 @@ export class PatientService {
       facilityId: user.facilityId,
       action: 'PATIENT_REGISTERED',
       resourceType: 'Patient',
-      resourceId: newPatient.id,
+      resourceId: newPatientId,
       requestId: requestId,
       result: 'SUCCESS',
     });
@@ -117,13 +166,21 @@ export class PatientService {
       complaint = dto.village ? `ASHA Sync (Village: ${dto.village})` : 'Synced from ASHA Field App';
     }
 
+    let priority = 'NORMAL';
+    const lowerComplaint = complaint.toLowerCase();
+    if (lowerComplaint.includes('chest pain') || lowerComplaint.includes('breath') || lowerComplaint.includes('unconscious')) {
+      priority = 'EMERGENCY';
+    } else if (lowerComplaint.includes('fever') || lowerComplaint.includes('severe') || lowerComplaint.includes('reduced movement')) {
+      priority = 'HIGH';
+    }
+
     await this.queueService.createEntry({
       facilityId: facilityId,
       patientName: patientName,
       age: dto.age ? String(dto.age) : '35',
       gender: dto.gender || 'Female',
       chiefComplaint: complaint,
-      priority: 'NORMAL',
+      priority: priority,
       weight: dto.weight,
       hb: dto.hb,
       bpVital: dto.bp,
