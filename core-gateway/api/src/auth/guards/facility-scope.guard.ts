@@ -42,7 +42,7 @@ export class FacilityScopeGuard implements CanActivate {
         return true; // Granted
       }
 
-      throw new ForbiddenException(`Cross-facility access denied. User belongs to \${user.facilityId}`);
+      throw new ForbiddenException(`Cross-facility access denied. User belongs to ${user.facilityId}`);
     }
 
     return true;
