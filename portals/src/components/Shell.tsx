@@ -46,59 +46,6 @@ export default function Shell({ children, title, subtitle, user = 'Dr. Anjali Pa
       </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-      {/* ── SIDEBAR ── */}
-      <aside style={{
-        width: '220px',
-        flexShrink: 0,
-        background: '#0b1a2d',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        {/* Logo */}
-        <div style={{ padding: '1rem 1.25rem', background: '#071221', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
-          <div style={{ width: '32px', height: '32px', background: '#ea580c', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem', color: 'white', flexShrink: 0 }}>RP</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'white', lineHeight: 1.2 }}>RuralPulse</div>
-            <div style={{ fontSize: '0.6rem', color: '#94a3b8', letterSpacing: '0.05em' }}>GOVT. HEALTH PORTAL</div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '0.75rem 0', overflowY: 'auto' }}>
-          {NAV_ITEMS.map(item => {
-            const isActive = pathname === item.href;
-            return (
-              <a key={item.href} href={item.href} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.625rem',
-                padding: '0.625rem 1.25rem',
-                color: isActive ? 'white' : '#94a3b8',
-                background: isActive ? 'rgba(16,185,129,0.15)' : 'transparent',
-                borderLeft: isActive ? '3px solid #10b981' : '3px solid transparent',
-                textDecoration: 'none',
-                fontSize: '0.8125rem',
-                fontWeight: isActive ? 600 : 400,
-                transition: 'all 0.15s',
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px' }}>{item.icon}</span>
-                {item.label}
-              </a>
-            );
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>{facility}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.375rem' }}>
-            <span style={{ width: '6px', height: '6px', background: '#10b981', borderRadius: '50%', display: 'inline-block' }}></span>
-            <span style={{ fontSize: '0.7rem', color: '#10b981' }}>All Systems Operational</span>
-          </div>
-          <div style={{ fontSize: '0.65rem', color: '#475569', marginTop: '0.25rem' }}>Last sync: 09:30 AM</div>
-        </div>
-      </aside>
 
       {/* ── MAIN WRAPPER ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
