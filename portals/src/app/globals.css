@@ -1,23 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
+
 :root {
-  /* Enterprise Colors */
+  /* Government/Institutional Colors */
   --bg-app: #f4f7f9;
-  --bg-sidebar: #0b1a2d; /* Dark navy */
-  --bg-sidebar-hover: #162a45;
-  --sidebar-active-border: #0ea5e9;
+  --bg-sidebar: #1e3a8a; /* Institutional Blue (blue-900) */
+  --bg-sidebar-hover: #1e40af; /* Lighter blue for hover */
+  --sidebar-active-border: #ea580c; /* Saffron active border */
   
-  --bg-header: #071221;
+  --bg-header: #1e3a8a; /* Matches sidebar */
   
   --bg-card: #ffffff;
-  --border-color: #e5e7eb;
+  --border-color: #e2e8f0;
   
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
   --text-sidebar: #cbd5e1;
   --text-sidebar-active: #ffffff;
   
-  --accent-primary: #047857; /* SwasthyaSetu green brand */
-  --accent-secondary: #0ea5e9;
+  --accent-primary: #1e40af; /* Primary blue CTA */
+  --accent-secondary: #ea580c; /* Saffron CTA */
+
   
   /* Status Colors */
   --status-success: #10b981;
@@ -40,8 +43,12 @@
 body {
   background-color: var(--bg-app);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Noto Sans Devanagari", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
+}
+
+h1, h2, h3, .serif-heading {
+  font-family: "Merriweather", "Noto Sans Devanagari", serif;
 }
 
 /* ==========================================================================

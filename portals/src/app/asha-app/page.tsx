@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/LoginGate';
 import { apiPost } from '@/lib/api';
 import { savePatientLocally, getUnsyncedPatients, markPatientAsSynced } from '@/lib/db';
+import { ClipboardEdit, RefreshCw, Baby, HeartPulse, LogOut } from 'lucide-react';
 
 export default function AshaApp() {
   const { user, logout } = useAuth();
@@ -137,7 +138,9 @@ export default function AshaApp() {
               </div>
               <div style={s.roleBadge}>ASHA Worker</div>
             </div>
-            <button onClick={logout} style={{ background: 'rgba(0,0,0,0.2)', border: 'none', color: 'white', padding: '0.375rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer' }}>Logout</button>
+            <button onClick={logout} style={{ background: 'rgba(0,0,0,0.2)', border: 'none', color: 'white', padding: '0.375rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <LogOut size={14} /> Logout
+            </button>
           </div>
 
           <div style={s.statsContainer}>
@@ -157,23 +160,23 @@ export default function AshaApp() {
 
           <div style={s.actionGrid}>
             <div style={s.actionCard} onClick={() => setView('register')}>
-              <div style={s.actionIcon}>📝</div>
-              <div style={s.actionText}>Register Patient</div>
+              <div style={s.actionIcon}><ClipboardEdit size={28} /></div>
+              <div style={s.actionText}>Register / नोंदणी</div>
             </div>
             <div style={{ ...s.actionCard, background: pendingSync > 0 ? '#eff6ff' : 'white', borderColor: pendingSync > 0 ? '#bfdbfe' : '#f1f5f9' }} onClick={handleSync}>
-              <div style={{ ...s.actionIcon, background: pendingSync > 0 ? '#3b82f6' : '#f8fafc', color: pendingSync > 0 ? 'white' : '#cbd5e1' }}>
-                {syncing ? '⌛' : '🔄'}
+              <div style={{ ...s.actionIcon, background: pendingSync > 0 ? '#1e40af' : '#f8fafc', color: pendingSync > 0 ? 'white' : '#cbd5e1' }}>
+                <RefreshCw size={28} className={syncing ? 'animate-spin' : ''} />
               </div>
               <div style={s.actionText}>
-                {syncing ? 'Syncing...' : `Sync Data (${pendingSync})`}
+                {syncing ? 'Syncing...' : `Sync / सिंक (${pendingSync})`}
               </div>
             </div>
             <div style={{ ...s.actionCard, opacity: 0.6 }}>
-              <div style={{ ...s.actionIcon, background: '#fdf4ff', color: '#d946ef' }}>👶</div>
-              <div style={s.actionText}>Child Immunization</div>
+              <div style={{ ...s.actionIcon, background: '#fdf4ff', color: '#d946ef' }}><Baby size={28} /></div>
+              <div style={s.actionText}>Immunization</div>
             </div>
             <div style={{ ...s.actionCard, opacity: 0.6 }}>
-              <div style={{ ...s.actionIcon, background: '#ecfdf5', color: '#10b981' }}>💊</div>
+              <div style={{ ...s.actionIcon, background: '#ecfdf5', color: '#10b981' }}><HeartPulse size={28} /></div>
               <div style={s.actionText}>NCD Screening</div>
             </div>
           </div>
@@ -181,9 +184,9 @@ export default function AshaApp() {
       ) : (
         <div style={{ padding: '1rem' }}>
           <button style={s.backBtn} onClick={() => setView('dashboard')}>
-            ← Back to Dashboard
+            ← Back / मागे
           </button>
-          <h2 style={{ color: '#1e293b', marginTop: '1rem', marginBottom: '1.5rem' }}>Register New Patient</h2>
+          <h2 className="serif-heading" style={{ color: '#1e293b', marginTop: '1rem', marginBottom: '1.5rem' }}>Register New Patient / नवीन रुग्ण नोंदणी</h2>
 
           {status === 'success' && (
             <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#047857', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontWeight: 600 }}>
@@ -266,8 +269,8 @@ export default function AshaApp() {
               <textarea required style={{ ...s.input, minHeight: '60px', resize: 'vertical' }} value={form.healthStatus} onChange={e => setForm({...form, healthStatus: e.target.value})} placeholder="What is the patient experiencing today?" />
             </div>
 
-            <button type="submit" disabled={status === 'loading'} style={{ ...s.btn, opacity: status === 'loading' ? 0.7 : 1 }}>
-              {status === 'loading' ? 'Saving...' : 'Register Patient'}
+            <button type="submit" disabled={status === 'loading'} style={{ ...s.btn, opacity: status === 'loading' ? 0.7 : 1, background: 'var(--accent-secondary)' }}>
+              {status === 'loading' ? 'Saving...' : 'Register / नोंदणी करा'}
             </button>
           </form>
         </div>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Shell from '@/components/Shell';
 import { apiGet, apiPost } from '@/lib/api';
+import { Users, Video, Microscope, MapPin } from 'lucide-react';
 
 const s = {
   card: { background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' } as React.CSSProperties,
@@ -268,8 +269,8 @@ export default function MODashboard() {
         <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
           {/* Patient Flow */}
           <div style={{ ...s.card, flex: 1 }}>
-            <div style={{ padding: '0.5rem 1rem', fontSize: '0.7rem', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #f1f5f9', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Patient Flow Today
+            <div className="serif-heading" style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Patient Flow Today / आजचे रुग्ण
             </div>
             <div style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {[
@@ -291,14 +292,14 @@ export default function MODashboard() {
 
           {/* KPI chips */}
           {[
-            { label: "Today's OPD", value: activeQueue.length, icon: '👥', color: '#3b82f6' },
-            { label: 'Queued Teleconsults', value: activeQueue.length, icon: '📹', color: '#0ea5e9' },
-            { label: 'Pending Lab Reports', value: diagOrders.filter(o => o.status === 'PENDING').length, icon: '🔬', color: '#10b981' },
+            { label: "Today's OPD", value: activeQueue.length, icon: <Users size={24} />, color: '#3b82f6' },
+            { label: 'Queued Teleconsults', value: activeQueue.length, icon: <Video size={24} />, color: '#0ea5e9' },
+            { label: 'Pending Lab Reports', value: diagOrders.filter(o => o.status === 'PENDING').length, icon: <Microscope size={24} />, color: '#10b981' },
           ].map(k => (
             <div key={k.label} style={{ ...s.card, width: '140px', padding: '1rem', textAlign: 'center', flexShrink: 0 }}>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, marginBottom: '0.5rem' }}>{k.label}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '0.5rem' }}>{k.label}</div>
               <div style={{ fontSize: '1.75rem', fontWeight: 700, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: '1.25rem', marginTop: '0.25rem' }}>{k.icon}</div>
+              <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center', color: k.color, opacity: 0.8 }}>{k.icon}</div>
             </div>
           ))}
         </div>
@@ -328,8 +329,8 @@ export default function MODashboard() {
                           EMERGENCY
                         </div>
                       )}
-                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.2rem' }}>
-                        📍 {p.chiefComplaint || 'Synced from ASHA'}
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <MapPin size={12} /> {p.chiefComplaint || 'Synced from ASHA'}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#1e293b', fontWeight: 600 }}>
                         <span>{p.patientName} ({p.age}{p.gender?.[0]})</span>
@@ -343,9 +344,9 @@ export default function MODashboard() {
                       </div>
                       <button
                         onClick={() => handleReferToExpert(p)}
-                        style={{ marginTop: '0.5rem', width: '100%', padding: '0.375rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ marginTop: '0.5rem', width: '100%', padding: '0.375rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
                       >
-                        Refer to Expert 📹
+                        <Video size={12} /> Refer to Expert / तज्ञांकडे पाठवा
                       </button>
                     </div>
                   ))
@@ -367,7 +368,7 @@ export default function MODashboard() {
                   const waitMins = Math.floor((Date.now() - new Date(q.createdAt).getTime()) / 60000);
                   return (
                     <div key={q.id} style={{ padding: '0.625rem 1rem', borderBottom: '1px solid #f8fafc', cursor: 'pointer', background: q.status === 'ACTIVE' ? '#f0fdf4' : 'white' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f766e', marginBottom: '0.2rem' }}>📍 {q.spokeFacilityId}</div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f766e', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><MapPin size={12} /> {q.spokeFacilityId}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
                         <span style={{ fontWeight: 600, color: '#1e293b' }}>{q.patientName}</span>
                         <span style={{ color: q.status === 'ACTIVE' ? '#10b981' : '#f59e0b', fontWeight: 600 }}>{q.status === 'ACTIVE' ? 'Live' : `Wait: ${waitMins}m`}</span>
@@ -408,7 +409,7 @@ export default function MODashboard() {
                   </>
                 ) : (
                   <div style={{ color: '#475569', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ fontSize: '2.5rem' }}>📹</div>
+                    <div style={{ color: '#334155' }}><Video size={48} /></div>
                     No active consultation
                   </div>
                 )}
@@ -580,8 +581,8 @@ export default function MODashboard() {
               {activeTab === 'diagnostics' && (
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                    <div style={{ fontWeight: 600 }}>Lab Orders</div>
-                    <button onClick={() => setShowOrderModal(true)} style={{ fontSize: '0.7rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem' }}>+ Order</button>
+                    <div style={{ fontWeight: 600 }}>Lab Orders / लॅब ऑर्डर</div>
+                    <button onClick={() => setShowOrderModal(true)} style={{ fontSize: '0.7rem', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem' }}>+ Order / नवीन ऑर्डर</button>
                   </div>
                   {diagOrders.map(order => (
                     <div key={order.id} style={{ padding: '0.5rem', border: '1px solid #e2e8f0', borderRadius: '6px', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
