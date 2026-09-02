@@ -38,7 +38,7 @@ export default function Shell({ children, title, subtitle, user = 'Dr. Anjali Pa
         zIndex: 10
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Seal_of_Maharashtra.svg/100px-Seal_of_Maharashtra.svg.png" style={{ height: '28px' }} alt="Government of Maharashtra Seal" />
+          <img src="/govt_seal.png" style={{ height: '28px' }} alt="Government of Maharashtra Seal" />
           <span className="serif-heading" style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>
             सार्वजनिक आरोग्य विभाग, महाराष्ट्र शासन | Department of Public Health, Government of Maharashtra
           </span>
